@@ -1,0 +1,55 @@
+// api/_db.js — shared MongoDB client (cached across serverless calls)
+const { MongoClient } = require('mongodb');
+
+const MONGO_URI = process.env.MONGO_URI;
+const DB_NAME   = 'miwa_rpg';
+const COL_NAME  = 'rpgdb';
+const DOC_ID    = 'main';
+
+let _client = null;
+
+async function getClient() {
+    if (!_client) {
+        _client = new MongoClient(MONGO_URI);
+        await _client.connect();
+    }
+    return _client;
+}
+
+async function getCollection() {
+    const client = await getClient();
+    return client.db(DB_NAME).collection(COL_NAME);
+}
+
+async function loadRpgDB() {
+    const col = await getCollection();
+    const doc = await col.findOne({ _id: DOC_ID });
+    return doc || { users: {}, market: [], guilds: {} };
+}
+
+async function saveUserData(senderId, userData) {
+    const col = await getCollection();
+    await col.updateOne(
+        { _id: DOC_ID },
+        { $set: { [`users.${senderId}`]: userData } },
+        { upsert: true }
+    );
+}
+
+async function saveBattleState(battleType, senderId, battleData) {
+    const col = await getCollection();
+    if (battleData === null) {
+        await col.updateOne(
+            { _id: DOC_ID },
+            { $unset: { [`${battleType}.${senderId}`]: '' } }
+        );
+    } else {
+        await col.updateOne(
+            { _id: DOC_ID },
+            { $set: { [`${battleType}.${senderId}`]: battleData } },
+            { upsert: true }
+        );
+    }
+}
+
+module.exports = { loadRpgDB, saveUserData, saveBattleState };
