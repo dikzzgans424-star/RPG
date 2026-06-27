@@ -151,8 +151,8 @@ module.exports = async (req, res) => {
             };
         }
 
-        await saveBattleState(bt, senderId, battleData);
-        await saveUserData(senderId, user);
+        await saveBattleState(db, bt, senderId, battleData);
+        await saveUserData(db, senderId, user);
 
         return res.status(200).json({ ok: true, battle: battleData, mode });
     } catch (err) {

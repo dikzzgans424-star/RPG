@@ -38,29 +38,39 @@ async function loadRpgDB() {
     return doc || { users: {}, market: [], guilds: {} };
 }
 
-async function saveUserData(senderId, userData) {
+// PENTING: jangan pakai $set dengan dot-path string berisi senderId
+// (contoh: `users.${senderId}`). Sender ID berformat JID mengandung titik
+// (mis. "6285810287828@s.whatsapp.net"), dan MongoDB akan salah artikan
+// titik itu sebagai NESTED PATH, bukan bagian dari nama key — alhasil data
+// kesimpan ke tempat lain dan tidak pernah ketemu lagi.
+// Bot WA sendiri selalu save SELURUH dokumen via `$set: dataToSave` (lihat
+// fungsi saveRpgDB di rpg.js) — jadi web app pakai pola yang sama di sini.
+async function saveRpgDB(db) {
     const col = await getCollection();
+    const { _id, ...dataToSave } = db;
     await col.updateOne(
         { _id: DOC_ID },
-        { $set: { [`users.${senderId}`]: userData } },
+        { $set: dataToSave },
         { upsert: true }
     );
 }
 
-async function saveBattleState(battleType, senderId, battleData) {
-    const col = await getCollection();
-    if (battleData === null) {
-        await col.updateOne(
-            { _id: DOC_ID },
-            { $unset: { [`${battleType}.${senderId}`]: '' } }
-        );
-    } else {
-        await col.updateOne(
-            { _id: DOC_ID },
-            { $set: { [`${battleType}.${senderId}`]: battleData } },
-            { upsert: true }
-        );
-    }
+// Helper lama, sekarang jadi pembungkus tipis di atas saveRpgDB supaya
+// tidak ada lagi yang nulis dot-path manual.
+async function saveUserData(db, senderId, userData) {
+    if (!db.users) db.users = {};
+    db.users[senderId] = userData;
+    await saveRpgDB(db);
 }
 
-module.exports = { loadRpgDB, saveUserData, saveBattleState, normalizeJid };
+async function saveBattleState(db, battleType, senderId, battleData) {
+    if (!db[battleType]) db[battleType] = {};
+    if (battleData === null) {
+        delete db[battleType][senderId];
+    } else {
+        db[battleType][senderId] = battleData;
+    }
+    await saveRpgDB(db);
+}
+
+module.exports = { loadRpgDB, saveRpgDB, saveUserData, saveBattleState, normalizeJid };

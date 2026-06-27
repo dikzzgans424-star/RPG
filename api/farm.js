@@ -107,7 +107,7 @@ module.exports = async (req, res) => {
             user.farmData[targetPlot].push({ type: plantType, amount: amt, startTime: now, harvestTime: now + plantTime });
 
             const durInfo = decreaseDurability(user, 'hoe', 1);
-            await saveUserData(senderId, user);
+            await saveUserData(db, senderId, user);
             return res.status(200).json({
                 ok: true, plot: targetPlot, plantType, amount: amt,
                 durationMin: Math.floor(plantTime / 60000), durability: durInfo,
@@ -145,7 +145,7 @@ module.exports = async (req, res) => {
                 const durInfo = decreaseDurability(user, 'hoe', 2);
                 user.exp = (user.exp || 0) + totalExp;
                 user.farmerCount = (user.farmerCount || 0) + count;
-                await saveUserData(senderId, user);
+                await saveUserData(db, senderId, user);
                 return res.status(200).json({ ok: true, harvested: totalHasil, totalExp, count, durability: durInfo, farm: buildFarmView(user, now) });
             } else {
                 const { plot, slot } = body;
@@ -160,7 +160,7 @@ module.exports = async (req, res) => {
                 const durInfo = decreaseDurability(user, 'hoe', 1);
                 user.exp = (user.exp || 0) + totalExp;
                 user.farmerCount = (user.farmerCount || 0) + 1;
-                await saveUserData(senderId, user);
+                await saveUserData(db, senderId, user);
                 return res.status(200).json({ ok: true, harvested: totalHasil, totalExp, count: 1, durability: durInfo, farm: buildFarmView(user, now) });
             }
         }

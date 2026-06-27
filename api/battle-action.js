@@ -247,7 +247,7 @@ module.exports = async (req, res) => {
                 fleeSuccess = true;
                 turnResult = 'flee';
                 logLines.push({ type: 'flee', text: '🏃 Berhasil kabur!' });
-                await saveBattleState(bt, senderId, null);
+                await saveBattleState(db, bt, senderId, null);
             } else {
                 logLines.push({ type: 'flee', text: '👟 Gagal kabur! Musuh menghalangi!' });
             }
@@ -292,12 +292,12 @@ module.exports = async (req, res) => {
                         b.monsterAilment = null;
                         turnResult = 'next_wave';
                         logLines.push({ type: 'wave', text: `🌊 Wave ${b.wave}/${b.maxWave} dimulai! ${isBossWave ? '👹 BOSS WAVE!' : ''}` });
-                        await saveBattleState(bt, senderId, b);
+                        await saveBattleState(db, bt, senderId, b);
                     } else {
                         // Horde selesai
                         turnResult = 'horde_complete';
                         reward = { gold: b.totalGold, exp: b.totalExp, kills: b.totalKills, loot: {} };
-                        await saveBattleState(bt, senderId, null);
+                        await saveBattleState(db, bt, senderId, null);
                         logLines.push({ type: 'win', text: `🏆 HORDE SURVIVED! ${b.totalKills} monster dikalahkan!` });
                     }
                 } else {
@@ -321,7 +321,7 @@ module.exports = async (req, res) => {
                             b.monsterAilment = null;
                             turnResult = 'next_phase';
                             logLines.push({ type: 'phase', text: `⚡ PHASE ${b.phase}/${b.maxPhase}! Ancient Beast berubah wujud!` });
-                            await saveBattleState(bt, senderId, b);
+                            await saveBattleState(db, bt, senderId, b);
                         } else {
                             gold = Math.floor(b.monster.gold * 3);
                             exp  = Math.floor(b.monster.exp * 3);
@@ -345,7 +345,7 @@ module.exports = async (req, res) => {
                         reward = { gold, exp, loot };
 
                         if (turnResult !== 'next_phase') {
-                            await saveBattleState(bt, senderId, null);
+                            await saveBattleState(db, bt, senderId, null);
                         }
                     }
                 }
@@ -357,17 +357,17 @@ module.exports = async (req, res) => {
                 user.hp = 20;
                 turnResult = 'lose';
                 logLines.push({ type: 'lose', text: `💀 DEFEATED! Kamu pingsan...` });
-                await saveBattleState(bt, senderId, null);
+                await saveBattleState(db, bt, senderId, null);
             } else {
                 if (turnResult !== 'next_wave' && turnResult !== 'next_phase') {
-                    await saveBattleState(bt, senderId, b);
+                    await saveBattleState(db, bt, senderId, b);
                 }
             }
         }
 
         // Recalc final stats (tetap pertahankan buff aktif) sebelum disimpan
         refreshStats(user, b);
-        await saveUserData(senderId, user);
+        await saveUserData(db, senderId, user);
 
         return res.status(200).json({
             ok: true,

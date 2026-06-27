@@ -61,6 +61,9 @@ module.exports = async (req, res) => {
                 cooldowns: user.cooldowns || {},
                 equipped: user.equipped || {},
                 ownedGears: user.ownedGears || [],
+                lastMining: user.lastMining || 0,
+                lastWood: user.lastWood || 0,
+                lastFish: user.lastFish || 0,
             },
             roleInfo: role ? {
                 name: role.name,

@@ -110,7 +110,7 @@ module.exports = async (req, res) => {
 
         const durInfo = decreaseDurability(user, slot, 1);
         recalculateStats(user);
-        await saveUserData(senderId, user);
+        await saveUserData(db, senderId, user);
 
         return res.status(200).json({
             ok: true,
