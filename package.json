@@ -1,0 +1,8 @@
+{
+  "name": "rpg-battle-web",
+  "version": "1.0.0",
+  "description": "RPG Battle Web - Miwa RPG",
+  "dependencies": {
+    "mongodb": "^6.0.0"
+  }
+}
