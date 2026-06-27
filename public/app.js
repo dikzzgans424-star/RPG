@@ -211,23 +211,23 @@ function showBattle() {
         horde: '👹 HORDE INVASION',
     };
     
-        // ════════════════════════════════════════
+    // ════════════════════════════════════════
     // FIX: TAMBAHKAN INFO FLOOR SAAT DUNGEON
     // ════════════════════════════════════════
     if (mode === 'dungeon') {
-        $('battleModeTag').textContent = `🏰 DUNGEON (Floor ${u.dungeonFloor || 1})`;
+        $('battleModeTag').textContent = `🏰 DUNGEON FLOOR ${u.dungeonFloor || 1}`;
     } else {
         $('battleModeTag').textContent = modeLabels[mode] || mode.toUpperCase();
     }
 
-
-    $('battleModeTag').textContent = modeLabels[mode] || mode.toUpperCase();
-    $('battleTurn').textContent    = `Turn ${b.turn || 1}`;
+    // Tanda turn battle
+    $('battleTurn').textContent = `Turn ${b.turn || 1}`;
 
     // Monster
     $('monsterEmoji').textContent  = b.monster?.emoji || '👹';
     $('monsterName').textContent   = b.monster?.name || '???';
     $('monsterStatus').textContent = b.isBoss ? '⚠️ BOSS' : (b.isBossWave ? '⚠️ BOSS WAVE' : '');
+
 
     if (mode === 'beast' && b.maxPhase) {
         $('monsterPhase').style.display = '';
@@ -492,6 +492,7 @@ function enableActions(enabled) {
 }
 
 // ─── SHOW RESULT ───
+// ─── SHOW RESULT ───
 function showResult(type, reward) {
     enableActions(false);
     $('backBtn').style.display = '';
@@ -520,17 +521,46 @@ function showResult(type, reward) {
         }
     }
 
+    // ════════════════════════════════════════
+    // FITUR BARU: TOMBOL LANJUT DUNGEON
+    // ════════════════════════════════════════
+    let nextBtnHTML = '';
+    if (currentMode === 'dungeon' && type === 'win') {
+        // Ambil info lantai yang barusan dikalahkan dari UI
+        let modeTagText = $('battleModeTag').textContent; 
+        let match = modeTagText.match(/Floor\s(\d+)/);
+        let justBeatenFloor = match ? parseInt(match[1]) : (currentUser.dungeonFloor || 1);
+        let nextFloor = justBeatenFloor + 1; // Hitung lantai selanjutnya
+
+        // Jika lantai selanjutnya BUKAN kelipatan 10 (Bukan Boss)
+        if (nextFloor % 10 !== 0) {
+            nextBtnHTML = `
+            <button class="action-btn" style="margin-top: 15px; width: 100%; background: rgba(56, 168, 157, 0.2); border-color: var(--teal);" onclick="continueDungeon()">
+                <span class="action-icon">⚔️</span>
+                <span>Lanjut Lantai ${nextFloor}</span>
+            </button>`;
+        } else {
+            // Jika lantai selanjutnya ADALAH kelipatan 10 (Boss Floor)
+            nextBtnHTML = `
+            <div style="margin-top: 15px; padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px dashed #ffc107; border-radius: 8px; font-size: 13px; color: #ffc107; text-align: center;">
+                ⚠️ Lantai ${nextFloor} adalah <b>BOSS FLOOR</b>!<br>Kembali ke Lobby untuk bersiap.
+            </div>`;
+        }
+    }
+
     const overlay = document.createElement('div');
     overlay.className = `result-overlay ${isWin ? 'result-win' : 'result-lose'}`;
     overlay.innerHTML = `
         <div class="result-title">${titleText}</div>
         ${rewardHTML}
+        ${nextBtnHTML}
     `;
     $('battleSection').insertBefore(overlay, $('backBtn'));
 
     currentBattle = null;
     setStatus(isWin ? 'Kamu menang! 🏆' : (type === 'flee' ? 'Berhasil kabur!' : 'Kamu kalah...'), isWin ? 'active' : 'warn');
 }
+
 
 // ─── END BATTLE / BACK ───
 async function endBattle() {
@@ -564,6 +594,27 @@ async function endBattle() {
     document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
     enableActions(true);
 }
+
+// ─── LANJUT DUNGEON OTOMATIS ───
+async function continueDungeon() {
+    // 1. Hapus overlay pop-up hasil battle
+    const overlay = $('battleSection').querySelector('.result-overlay');
+    if (overlay) overlay.remove();
+    
+    // 2. Sembunyikan tombol "Kembali ke Lobby"
+    $('backBtn').style.display = 'none';
+    
+    // 3. Reset status penguncian agar bisa nge-fetch API lagi
+    currentBattle = null;
+    isProcessing = false;
+    
+    // 4. Hentikan timer cooldown lama agar tidak bentrok
+    if (skillTimer) clearInterval(skillTimer);
+    
+    // 5. Tembak API Start Battle lagi dengan mode Dungeon
+    await startBattle('dungeon');
+}
+
 
 // ─── LOGOUT ───
 function logout() {
@@ -880,13 +931,17 @@ function syncExploreCooldowns(u) {
         const last = u[EXPLORE_LAST_FIELD[type]] || 0;
         const cdMs = info.cd * 1000;
         const elapsed = now - last;
+        
+        const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
+        const label = $(type === 'huntanimal' ? 'cdHuntAnim' : type === 'adventure' ? 'cdAdv' : 'cdExp');
+
         if (last && elapsed < cdMs) {
             const secondsLeft = Math.ceil((cdMs - elapsed) / 1000);
+            // FIX: Kunci tombol langsung saat inisialisasi jika masih cooldown!
+            if (btn) btn.disabled = true;
             startExploreCooldown(type, secondsLeft);
         } else {
             exploreBusy[type] = false;
-            const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
-            const label = $(type === 'huntanimal' ? 'cdHuntAnim' : type === 'adventure' ? 'cdAdv' : 'cdExp');
             if (btn) btn.disabled = false;
             if (label) label.textContent = 'Siap';
         }
@@ -897,6 +952,8 @@ function startExploreCooldown(type, seconds) {
     exploreBusy[type] = true;
     const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
     const label = $(type === 'huntanimal' ? 'cdHuntAnim' : type === 'adventure' ? 'cdAdv' : 'cdExp');
+    
+    // FIX: Pastikan tombol terkunci total (disabled) selama hitung mundur berjalan
     if (btn) btn.disabled = true;
     let left = seconds;
 
@@ -915,6 +972,28 @@ function startExploreCooldown(type, seconds) {
         }
     }, 1000);
 }
+
+function showExploreOverlay(type) {
+    const stage = document.querySelector('.gather-stage.explore-stage');
+    if (stage) stage.classList.remove('result-pop');
+    
+    // FIX: Memutus ketergantungan dari GATHER_LABEL agar tidak salah baca properti di memori
+    $('exploreBg').className = `gather-bg bg-explore bg-${type}`;
+    $('exploreIcon').textContent = EXPLORE_ICON[type];
+    $('exploreIcon').className = `gather-icon anim-explore ${type === 'huntanimal' ? 'huntanimal-fire' : type === 'adventure' ? 'adventure-walk' : 'explore-spin'}`;
+    $('exploreActionIcon').style.display = 'none'; 
+    
+    let captionText = 'Tiba di lokasi acak...';
+    if (type === 'huntanimal') captionText = 'Membidik hewan buruan...';
+    if (type === 'adventure') captionText = 'Menjelajahi lokasi tak dikenal...';
+    $('exploreCaption').textContent = captionText;
+
+    const oldResult = document.querySelector('.gather-stage.explore-stage .gather-result-text');
+    if (oldResult) oldResult.remove();
+    
+    $('exploreOverlay').style.display = 'flex';
+}
+
 
 // ════════════════════════════════════════
 // FUNGSI DO EXPLORE DENGAN ANIMASI
@@ -1016,29 +1095,7 @@ async function doExplore(type) {
 // ─── HELPER FUNGSI FUNGSI OVERLAY EXPLORE ───
 const EXPLORE_ICON = { huntanimal: '🏹', adventure: '🏕️', explore: '🌍' };
 
-function showExploreOverlay(type) {
-    const info = GATHER_LABEL[type === 'huntanimal' ? 'chop' : 'mine']; // Pinjam caption default biar ga ribet
-    const stage = document.querySelector('.gather-stage.explore-stage');
-    stage.classList.remove('result-pop');
-    
-    // Set tema overlay
-    $('exploreBg').className = `gather-bg bg-explore bg-${type}`;
-    $('exploreIcon').textContent = EXPLORE_ICON[type];
-    $('exploreIcon').className = `gather-icon anim-explore ${type === 'huntanimal' ? 'huntanimal-fire' : type === 'adventure' ? 'adventure-walk' : 'explore-spin'}`;
-    $('exploreActionIcon').style.display = 'none'; // Sembunyikan icon aksi dulu
-    
-    // Set caption sesuai tipe
-    let captionText = 'Tiba di lokasi acak...';
-    if (type === 'huntanimal') captionText = 'Membidik hewan buruan...';
-    if (type === 'adventure') captionText = 'Menjelajahi lokasi tak dikenal...';
-    $('exploreCaption').textContent = captionText;
-
-    // Bersihkan hasil lama
-    const oldResult = document.querySelector('.gather-result-text');
-    if (oldResult) oldResult.remove();
-    
-    $('exploreOverlay').style.display = 'flex';
-}
+ 
 
 function hideExploreOverlay() {
     $('exploreOverlay').style.display = 'none';
