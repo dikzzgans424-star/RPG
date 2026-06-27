@@ -1,6 +1,6 @@
 // api/battle-action.js — POST /api/battle-action
 // Body: { senderId, mode, action: 'attack'|'defend'|'dodge'|'potion'|'flee'|'skill', skillName? }
-const { loadRpgDB, saveUserData, saveBattleState, normalizeJid } = require('./_db');
+const { loadRpgDB, saveRpgDB, normalizeJid } = require('./_db');
 const {
     recalculateStats, applyBattleBuffs, useSkillRPG, levelUpCheck,
     getRandomLoot, DUNGEON_MONSTERS, BOSS_MONSTERS
@@ -12,6 +12,18 @@ const BATTLE_TYPE_MAP = {
     beast: 'beastBattle',
     horde: 'hordeBattle',
 };
+
+// Helper: mutasi db di-memori tanpa langsung save ke MongoDB.
+// Panggil saveRpgDB(db) SEKALI di akhir handler supaya tidak ada double-write.
+function setBattle(db, bt, senderId, data) {
+    if (!db[bt]) db[bt] = {};
+    if (data === null) delete db[bt][senderId];
+    else db[bt][senderId] = data;
+}
+function setUser(db, senderId, userData) {
+    if (!db.users) db.users = {};
+    db.users[senderId] = userData;
+}
 
 function ribu(n) { return Number(Math.floor(n)).toLocaleString('id-ID'); }
 
@@ -247,7 +259,7 @@ module.exports = async (req, res) => {
                 fleeSuccess = true;
                 turnResult = 'flee';
                 logLines.push({ type: 'flee', text: '🏃 Berhasil kabur!' });
-                await saveBattleState(db, bt, senderId, null);
+                setBattle(db, bt, senderId, null);
             } else {
                 logLines.push({ type: 'flee', text: '👟 Gagal kabur! Musuh menghalangi!' });
             }
@@ -292,12 +304,12 @@ module.exports = async (req, res) => {
                         b.monsterAilment = null;
                         turnResult = 'next_wave';
                         logLines.push({ type: 'wave', text: `🌊 Wave ${b.wave}/${b.maxWave} dimulai! ${isBossWave ? '👹 BOSS WAVE!' : ''}` });
-                        await saveBattleState(db, bt, senderId, b);
+                        setBattle(db, bt, senderId, b);
                     } else {
                         // Horde selesai
                         turnResult = 'horde_complete';
                         reward = { gold: b.totalGold, exp: b.totalExp, kills: b.totalKills, loot: {} };
-                        await saveBattleState(db, bt, senderId, null);
+                        setBattle(db, bt, senderId, null);
                         logLines.push({ type: 'win', text: `🏆 HORDE SURVIVED! ${b.totalKills} monster dikalahkan!` });
                     }
                 } else {
@@ -321,7 +333,7 @@ module.exports = async (req, res) => {
                             b.monsterAilment = null;
                             turnResult = 'next_phase';
                             logLines.push({ type: 'phase', text: `⚡ PHASE ${b.phase}/${b.maxPhase}! Ancient Beast berubah wujud!` });
-                            await saveBattleState(db, bt, senderId, b);
+                            setBattle(db, bt, senderId, b);
                         } else {
                             gold = Math.floor(b.monster.gold * 3);
                             exp  = Math.floor(b.monster.exp * 3);
@@ -345,7 +357,7 @@ module.exports = async (req, res) => {
                         reward = { gold, exp, loot };
 
                         if (turnResult !== 'next_phase') {
-                            await saveBattleState(db, bt, senderId, null);
+                            setBattle(db, bt, senderId, null);
                         }
                     }
                 }
@@ -357,17 +369,19 @@ module.exports = async (req, res) => {
                 user.hp = 20;
                 turnResult = 'lose';
                 logLines.push({ type: 'lose', text: `💀 DEFEATED! Kamu pingsan...` });
-                await saveBattleState(db, bt, senderId, null);
+                setBattle(db, bt, senderId, null);
             } else {
                 if (turnResult !== 'next_wave' && turnResult !== 'next_phase') {
-                    await saveBattleState(db, bt, senderId, b);
+                    setBattle(db, bt, senderId, b);
                 }
             }
         }
 
         // Recalc final stats (tetap pertahankan buff aktif) sebelum disimpan
         refreshStats(user, b);
-        await saveUserData(db, senderId, user);
+        // Simpan user + battle state dalam SATU write ke MongoDB supaya tidak race condition
+        setUser(db, senderId, user);
+        await saveRpgDB(db);
 
         return res.status(200).json({
             ok: true,

@@ -126,6 +126,11 @@ module.exports = async (req, res) => {
                 inventory: user.inventory,
                 hp: user.hp, maxHp: user.maxHp, mana: user.mana, maxMana: user.maxMana,
                 atk: user.atk, def: user.def,
+                // Timestamp ini WAJIB dikembalikan supaya syncGatherCooldowns di frontend
+                // bisa sinkronkan cooldown dengan benar setelah refresh Chrome.
+                lastMining: user.lastMining || 0,
+                lastWood: user.lastWood || 0,
+                lastFish: user.lastFish || 0,
             },
             cooldown: GATHER_COOLDOWN[type],
         });
