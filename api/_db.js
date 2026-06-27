@@ -21,6 +21,17 @@ async function getCollection() {
     return client.db(DB_NAME).collection(COL_NAME);
 }
 
+// Bot WA menyimpan key user/battle sebagai JID LENGKAP, contoh:
+// "6285810287828@s.whatsapp.net" — bukan cuma nomornya doang.
+// Semua endpoint web HARUS pakai JID ini juga waktu baca/tulis ke DB,
+// supaya datanya konsisten dengan bot.
+function normalizeJid(id) {
+    if (!id) return id;
+    let clean = String(id).trim().replace(/[^0-9@.a-zA-Z]/g, '');
+    if (clean.includes('@')) return clean; // sudah JID lengkap (s.whatsapp.net / lid / g.us)
+    return `${clean}@s.whatsapp.net`;
+}
+
 async function loadRpgDB() {
     const col = await getCollection();
     const doc = await col.findOne({ _id: DOC_ID });
@@ -52,4 +63,4 @@ async function saveBattleState(battleType, senderId, battleData) {
     }
 }
 
-module.exports = { loadRpgDB, saveUserData, saveBattleState };
+module.exports = { loadRpgDB, saveUserData, saveBattleState, normalizeJid };

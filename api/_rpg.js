@@ -222,7 +222,83 @@ function useSkillRPG(user, skillName) {
     return { success: true, skill };
 }
 
-// Monster pools per mode (khusus web, tidak ada 1 sumber data yang identik di rpg.js)
+function getEquippedItem(u, slotType) {
+    const gearId = u.equipped?.[slotType];
+    return gearId ? (u.ownedGears || []).find(g => g.id === gearId) : null;
+}
+
+function decreaseDurability(u, slotType, amount = 1) {
+    const gearId = u.equipped?.[slotType];
+    if (!gearId) return { broke: false, msg: '' };
+    const gear = (u.ownedGears || []).find(g => g.id === gearId);
+    if (!gear) { u.equipped[slotType] = null; return { broke: false, msg: '' }; }
+
+    gear.durability -= amount;
+    if (gear.durability > 0 && gear.durability <= 10) {
+        return { broke: false, msg: `⚠️ Durabilitas ${gear.name} tersisa ${gear.durability}! Segera repair.` };
+    }
+    if (gear.durability <= 0) {
+        gear.durability = 0;
+        u.equipped[slotType] = null;
+        return { broke: true, msg: `🛠️ ${gear.name} rusak parah dan terlepas! Gunakan .repair (bot) atau menu Repair untuk perbaiki.` };
+    }
+    return { broke: false, msg: '' };
+}
+
+// ── LIFE SKILL TABLES (disalin dari rpg.js) ──
+const ORE_TABLE = [
+    { name: 'Batu',       key: 'stone',         min: 5, max: 15, chance: 1.0,  exp: 5,    minLvl: 1 },
+    { name: 'Batu Bara',  key: 'coal',          min: 3, max: 8,  chance: 0.6,  exp: 10,   minLvl: 1 },
+    { name: 'Tembaga',    key: 'copper',        min: 2, max: 6,  chance: 0.8,  exp: 15,   minLvl: 1 },
+    { name: 'Besi',       key: 'iron',          min: 2, max: 5,  chance: 0.7,  exp: 20,   minLvl: 2 },
+    { name: 'Perak',      key: 'silver',        min: 1, max: 4,  chance: 0.5,  exp: 35,   minLvl: 2 },
+    { name: 'Emas',       key: 'gold_ore',      min: 1, max: 3,  chance: 0.3,  exp: 50,   minLvl: 3 },
+    { name: 'Mythril',    key: 'mythril',       min: 1, max: 1,  chance: 0.05, exp: 500,  minLvl: 3 },
+    { name: 'Sapphire',   key: 'sapphire',      min: 1, max: 2,  chance: 0.15, exp: 100,  minLvl: 3 },
+    { name: 'Ruby',       key: 'ruby',          min: 1, max: 2,  chance: 0.12, exp: 120,  minLvl: 3 },
+    { name: 'Emerald',    key: 'emerald',       min: 1, max: 2,  chance: 0.10, exp: 150,  minLvl: 4 },
+    { name: 'Berlian',    key: 'diamond',       min: 1, max: 2,  chance: 0.08, exp: 200,  minLvl: 4 },
+    { name: 'Obsidian',   key: 'obsidian_ore',  min: 1, max: 1,  chance: 0.02, exp: 1000, minLvl: 5 },
+];
+
+const WOOD_TABLE = [
+    { name: 'Kayu',          key: 'wood',         min: 10, max: 20, chance: 1.0,  exp: 5  },
+    { name: 'Daun',          key: 'leaf',         min: 5,  max: 12, chance: 0.8,  exp: 2  },
+    { name: 'Apel',          key: 'apple',        min: 1,  max: 3,  chance: 0.45, exp: 10 },
+    { name: 'Mangga',        key: 'mango',        min: 1,  max: 2,  chance: 0.25, exp: 20 },
+    { name: 'Blueberry',     key: 'blueberry',    min: 2,  max: 5,  chance: 0.3,  exp: 15 },
+    { name: 'Sarang Burung', key: 'nest',         min: 1,  max: 1,  chance: 0.1,  exp: 50 },
+    { name: 'Getah Maple',   key: 'maple_syrup',  min: 1,  max: 2,  chance: 0.15, exp: 40 },
+];
+
+const FISH_TABLE = [
+    { name: 'Lele',      key: 'lele',      chance: 0.60, exp: 10,   minRod: 1  },
+    { name: 'Nila',      key: 'nila',      chance: 0.50, exp: 15,   minRod: 1  },
+    { name: 'Mujair',    key: 'mujair',    chance: 0.40, exp: 20,   minRod: 1  },
+    { name: 'Gurame',    key: 'gurame',    chance: 0.30, exp: 30,   minRod: 2  },
+    { name: 'Salmon',    key: 'salmon',    chance: 0.15, exp: 50,   minRod: 3  },
+    { name: 'Tuna',      key: 'tuna',      chance: 0.10, exp: 80,   minRod: 4  },
+    { name: 'Hiu',       key: 'hiu',       chance: 0.05, exp: 200,  minRod: 5  },
+    { name: 'Paus',      key: 'paus',      chance: 0.02, exp: 500,  minRod: 7  },
+    { name: 'Leviathan', key: 'leviathan', chance: 0.005,exp: 2000, minRod: 10 },
+];
+
+const PLANT_TABLE = {
+    wheat:     { seed: 'wheat_seeds',     hasil: 'wheat',     exp: 30,  base: 5,  time: 60000   },
+    carrot:    { seed: 'carrot_seeds',    hasil: 'carrot',    exp: 40,  base: 6,  time: 120000  },
+    potato:    { seed: 'potato_seeds',    hasil: 'potato',    exp: 50,  base: 6,  time: 180000  },
+    corn:      { seed: 'corn_seeds',      hasil: 'corn',      exp: 65,  base: 8,  time: 300000  },
+    tomato:    { seed: 'tomato_seeds',    hasil: 'tomato',    exp: 73,  base: 10, time: 600000  },
+    pumpkin:   { seed: 'pumpkin_seeds',   hasil: 'pumpkin',   exp: 99,  base: 12, time: 900000  },
+    melon:     { seed: 'melon_seeds',     hasil: 'melon',     exp: 120, base: 15, time: 1200000 },
+    beetroot:  { seed: 'beetroot_seeds',  hasil: 'beetroot',  exp: 150, base: 18, time: 1800000 },
+    cocoa:     { seed: 'cocoa_beans',     hasil: 'chocolate', exp: 190, base: 20, time: 3600000 },
+    coconut:   { seed: 'coconut_seeds',   hasil: 'coconut',   exp: 200, base: 1,  time: 7200000 },
+};
+
+const GATHER_COOLDOWN = { mine: 60000, chop: 45000, fish: 30000 };
+
+
 const HUNT_MONSTERS = [
     { name: 'Goblin Liar',     emoji: '👺', hp: 300,  atk: 40,  def: 10, exp: 120, gold: 80  },
     { name: 'Skeleton Archer', emoji: '🦴', hp: 280,  atk: 55,  def: 5,  exp: 130, gold: 90  },
@@ -274,5 +350,7 @@ function getRandomLoot(isBoss, floor = 1) {
 
 module.exports = {
     roleData, recalculateStats, applyBattleBuffs, useSkillRPG, getReqExp, levelUpCheck,
+    getEquippedItem, decreaseDurability,
+    ORE_TABLE, WOOD_TABLE, FISH_TABLE, PLANT_TABLE, GATHER_COOLDOWN,
     HUNT_MONSTERS, DUNGEON_MONSTERS, BOSS_MONSTERS, getRandomLoot
 };

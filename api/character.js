@@ -1,5 +1,5 @@
 // api/character.js — GET /api/character?id=SENDER_ID
-const { loadRpgDB } = require('./_db');
+const { loadRpgDB, normalizeJid } = require('./_db');
 const { recalculateStats, roleData } = require('./_rpg');
 
 module.exports = async (req, res) => {
@@ -9,8 +9,9 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Parameter ?id= diperlukan' });
+    const { id: rawId } = req.query;
+    if (!rawId) return res.status(400).json({ error: 'Parameter ?id= diperlukan' });
+    const id = normalizeJid(rawId);
 
     try {
         const db = await loadRpgDB();

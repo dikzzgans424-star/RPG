@@ -1,6 +1,6 @@
 // api/battle-action.js — POST /api/battle-action
 // Body: { senderId, mode, action: 'attack'|'defend'|'dodge'|'potion'|'flee'|'skill', skillName? }
-const { loadRpgDB, saveUserData, saveBattleState } = require('./_db');
+const { loadRpgDB, saveUserData, saveBattleState, normalizeJid } = require('./_db');
 const {
     recalculateStats, applyBattleBuffs, useSkillRPG, levelUpCheck,
     getRandomLoot, DUNGEON_MONSTERS, BOSS_MONSTERS
@@ -144,8 +144,9 @@ module.exports = async (req, res) => {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
 
-    const { senderId, mode, action, skillName } = body;
-    if (!senderId || !mode || !action) return res.status(400).json({ error: 'senderId, mode, action wajib' });
+    const { senderId: rawSenderId, mode, action, skillName } = body;
+    if (!rawSenderId || !mode || !action) return res.status(400).json({ error: 'senderId, mode, action wajib' });
+    const senderId = normalizeJid(rawSenderId);
 
     const bt = BATTLE_TYPE_MAP[mode];
     if (!bt) return res.status(400).json({ error: 'Mode tidak valid' });

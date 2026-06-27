@@ -1,6 +1,6 @@
 // api/battle-start.js — POST /api/battle-start
 // Body: { senderId, mode: 'hunt'|'dungeon'|'beast'|'horde' }
-const { loadRpgDB, saveUserData, saveBattleState } = require('./_db');
+const { loadRpgDB, saveUserData, saveBattleState, normalizeJid } = require('./_db');
 const { recalculateStats, HUNT_MONSTERS, DUNGEON_MONSTERS, BOSS_MONSTERS } = require('./_rpg');
 
 const BATTLE_TYPE_MAP = {
@@ -22,9 +22,10 @@ module.exports = async (req, res) => {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
 
-    const { senderId, mode } = body;
-    if (!senderId || !mode) return res.status(400).json({ error: 'senderId & mode wajib diisi' });
+    const { senderId: rawSenderId, mode } = body;
+    if (!rawSenderId || !mode) return res.status(400).json({ error: 'senderId & mode wajib diisi' });
     if (!BATTLE_TYPE_MAP[mode]) return res.status(400).json({ error: 'Mode tidak valid' });
+    const senderId = normalizeJid(rawSenderId);
 
     try {
         const db = await loadRpgDB();
