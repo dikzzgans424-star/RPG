@@ -112,8 +112,6 @@ function showDashboard(data) {
     syncExploreCooldowns(u); // <--- TAMBAHKAN BARIS INI
 }
 
-}
-
 
 function updateCharStats(u) {
     const hpPct   = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
