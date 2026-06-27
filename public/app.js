@@ -619,6 +619,8 @@ async function doGather(type) {
             currentUser = { ...currentUser, ...data.user };
             updateCharStats(currentUser);
             $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
+            // Sinkronkan ulang cooldown dari timestamp server (bukan hanya timer JS lokal)
+            syncGatherCooldowns(currentUser);
         }
 
         await new Promise(r => setTimeout(r, 1600));
