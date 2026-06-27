@@ -108,6 +108,46 @@
       <div id="skillsList"></div>
     </div>
 
+    <!-- Life Skills -->
+    <div id="lifeSkillSection">
+      <div class="section-title">🌿 Life Skills</div>
+      <div class="mode-grid">
+        <button class="mode-btn lifeskill-btn" id="btnMine" onclick="doGather('mine')">
+          <div class="mode-icon">⛏️</div>
+          <div class="mode-name">Mining</div>
+          <div class="mode-desc" id="cdMine">Butuh Pickaxe</div>
+        </button>
+        <button class="mode-btn lifeskill-btn" id="btnChop" onclick="doGather('chop')">
+          <div class="mode-icon">🪓</div>
+          <div class="mode-name">Woodcut</div>
+          <div class="mode-desc" id="cdChop">Butuh Axe</div>
+        </button>
+        <button class="mode-btn lifeskill-btn" id="btnFish" onclick="doGather('fish')">
+          <div class="mode-icon">🎣</div>
+          <div class="mode-name">Fishing</div>
+          <div class="mode-desc" id="cdFish">Butuh Fishing Rod</div>
+        </button>
+        <button class="mode-btn lifeskill-btn" id="btnFarm" onclick="toggleFarmPanel()">
+          <div class="mode-icon">🌾</div>
+          <div class="mode-name">Farming</div>
+          <div class="mode-desc">Tanam & Panen</div>
+        </button>
+      </div>
+      <div class="glass-card" id="lifeLog" style="display:none"></div>
+    </div>
+
+    <!-- Farm Panel -->
+    <div class="glass-card" id="farmPanel" style="display:none">
+      <div class="section-title">🌾 Lahan Pertanian</div>
+      <div id="farmPlotsView"></div>
+      <div class="farm-plant-row">
+        <select id="plantSelect"></select>
+        <input id="plantAmount" type="number" min="1" value="1" style="width:60px">
+        <button class="btn-small" onclick="doPlant()">🌱 Tanam</button>
+      </div>
+      <button class="btn-small btn-harvest-all" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
+    </div>
+
   </div>
 
   <!-- Battle Section (hidden initially) -->
