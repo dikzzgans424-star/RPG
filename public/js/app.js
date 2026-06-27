@@ -493,6 +493,191 @@ function fmt(n) {
     return Number(Math.floor(n || 0)).toLocaleString('id-ID');
 }
 
+// ════════════════════════════════════════
+//  LIFE SKILLS — Mining / Woodcut / Fishing
+// ════════════════════════════════════════
+const GATHER_LABEL = {
+    mine: { icon: '⛏️', title: 'Mining', cd: 60 },
+    chop: { icon: '🪓', title: 'Woodcut', cd: 45 },
+    fish: { icon: '🎣', title: 'Fishing', cd: 30 },
+};
+let gatherBusy = {};
+const gatherTimers = {};
+
+function senderId() { return currentUser?.senderId; }
+
+async function doGather(type) {
+    if (!currentUser) return;
+    if (gatherBusy[type]) return;
+    const btn = $(type === 'mine' ? 'btnMine' : type === 'chop' ? 'btnChop' : 'btnFish');
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/gather', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), type }),
+        });
+        const data = await res.json();
+
+        if (!data.ok) {
+            showLifeLog(`❌ ${data.error}`);
+            if (data.cooldownLeft) startGatherCooldown(type, data.cooldownLeft);
+            else btn.disabled = false;
+            return;
+        }
+
+        if (data.empty) {
+            showLifeLog(`${GATHER_LABEL[type].icon} ${data.message}`);
+        } else {
+            const lines = data.rewards.map(r => `+${r.amount}x ${r.name}`).join(', ');
+            let html = `${GATHER_LABEL[type].icon} <b>${GATHER_LABEL[type].title}</b> — ${lines}<br>✨ Exp ${data.expText}`;
+            if (data.durability?.msg) html += `<br><span class="warn-text">${data.durability.msg}</span>`;
+            if (data.levelUpLog?.length) html += `<br>⭐ ${data.levelUpLog.map(l => l.text).join(' ')}`;
+            showLifeLog(html);
+            currentUser = { ...currentUser, ...data.user };
+            updateCharStats(currentUser);
+            $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
+        }
+
+        startGatherCooldown(type, Math.floor((data.cooldown || GATHER_LABEL[type].cd * 1000) / 1000));
+    } catch (e) {
+        showLifeLog('❌ Gagal terhubung ke server.');
+        btn.disabled = false;
+    }
+}
+
+function startGatherCooldown(type, seconds) {
+    gatherBusy[type] = true;
+    const btn = $(type === 'mine' ? 'btnMine' : type === 'chop' ? 'btnChop' : 'btnFish');
+    const label = $(type === 'mine' ? 'cdMine' : type === 'chop' ? 'cdChop' : 'cdFish');
+    btn.disabled = true;
+    let left = seconds;
+
+    if (gatherTimers[type]) clearInterval(gatherTimers[type]);
+    label.textContent = `⏳ ${left}s`;
+    gatherTimers[type] = setInterval(() => {
+        left--;
+        if (left <= 0) {
+            clearInterval(gatherTimers[type]);
+            gatherBusy[type] = false;
+            btn.disabled = false;
+            label.textContent = GATHER_LABEL[type].title === 'Mining' ? 'Butuh Pickaxe' :
+                GATHER_LABEL[type].title === 'Woodcut' ? 'Butuh Axe' : 'Butuh Fishing Rod';
+        } else {
+            label.textContent = `⏳ ${left}s`;
+        }
+    }, 1000);
+}
+
+function showLifeLog(html) {
+    const box = $('lifeLog');
+    box.style.display = '';
+    box.innerHTML = `<div class="log-entry log-system">${html}</div>` + box.innerHTML;
+}
+
+// ════════════════════════════════════════
+//  FARMING
+// ════════════════════════════════════════
+function toggleFarmPanel() {
+    const panel = $('farmPanel');
+    const willShow = panel.style.display === 'none';
+    panel.style.display = willShow ? '' : 'none';
+    if (willShow) loadFarm();
+}
+
+async function loadFarm() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/farm?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (!data.ok) { $('farmPlotsView').innerHTML = `<div class="error-text">${data.error}</div>`; return; }
+        renderFarm(data.farm);
+    } catch (e) {
+        $('farmPlotsView').innerHTML = `<div class="error-text">Gagal memuat lahan.</div>`;
+    }
+}
+
+function renderFarm(farm) {
+    const select = $('plantSelect');
+    if (select.options.length === 0) {
+        Object.entries(farm.plantTable).forEach(([key, p]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = `${key} (${Math.floor(p.time / 60000)}m)`;
+            select.appendChild(opt);
+        });
+    }
+
+    if (farm.farmPlots === 0) {
+        $('farmPlotsView').innerHTML = `<div class="error-text">Belum punya lahan. Beli di shop bot WA dulu.</div>`;
+        return;
+    }
+
+    let html = '';
+    farm.plots.forEach(p => {
+        html += `<div class="farm-plot"><b>Lahan ${p.plot}</b>`;
+        if (p.slots.length === 0) html += `<div class="farm-slot-empty">📭 Siap ditanami</div>`;
+        p.slots.forEach(s => {
+            html += `<div class="farm-slot">
+                <span>${s.type.toUpperCase()} x${s.amount}</span>
+                <div class="farm-progress"><div class="farm-progress-fill" style="width:${s.progress}%"></div></div>
+                ${s.ready
+                    ? `<button class="btn-small" onclick="doHarvest(${p.plot},${s.slot})">🧺 Panen</button>`
+                    : `<span class="farm-pct">${s.progress}%</span>`}
+            </div>`;
+        });
+        html += `</div>`;
+    });
+    $('farmPlotsView').innerHTML = html;
+}
+
+async function doPlant() {
+    const plantType = $('plantSelect').value;
+    const amount = parseInt($('plantAmount').value) || 1;
+    try {
+        const res = await fetch('/api/farm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'plant', plantType, amount }),
+        });
+        const data = await res.json();
+        if (!data.ok) { showLifeLog(`❌ ${data.error}`); return; }
+        showLifeLog(`🌱 Ditanam: ${amount}x ${plantType} di Lahan ${data.plot} (siap dalam ${data.durationMin} menit)`);
+        renderFarm(data.farm);
+    } catch (e) { showLifeLog('❌ Gagal menanam.'); }
+}
+
+async function doHarvest(plot, slot) {
+    try {
+        const res = await fetch('/api/farm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'harvest', plot, slot }),
+        });
+        const data = await res.json();
+        if (!data.ok) { showLifeLog(`❌ ${data.error}`); return; }
+        const lines = Object.entries(data.harvested).map(([k, v]) => `+${v}x ${k}`).join(', ');
+        showLifeLog(`🧺 Panen: ${lines} (✨ +${data.totalExp} EXP)`);
+        renderFarm(data.farm);
+    } catch (e) { showLifeLog('❌ Gagal memanen.'); }
+}
+
+async function doHarvestAll() {
+    try {
+        const res = await fetch('/api/farm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'harvestAll' }),
+        });
+        const data = await res.json();
+        if (!data.ok) { showLifeLog(`❌ ${data.error}`); return; }
+        const lines = Object.entries(data.harvested).map(([k, v]) => `+${v}x ${k}`).join(', ');
+        showLifeLog(`🧺 Panen Raya: ${lines} (✨ +${data.totalExp} EXP, ${data.count} slot)`);
+        renderFarm(data.farm);
+    } catch (e) { showLifeLog('❌ Gagal memanen.'); }
+}
+
 // ─── AUTO-LOGIN (from localStorage) ───
 window.addEventListener('DOMContentLoaded', () => {
     const saved = localStorage.getItem('rpg_sender_id');
@@ -508,4 +693,3 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') loadCharacter();
     });
 });
-
