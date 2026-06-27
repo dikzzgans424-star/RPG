@@ -1028,3 +1028,29 @@ body::after {
     color: #f4d160;
     font-family: 'Rajdhani', sans-serif;
 }
+
+    /* Exploration Overlay Styles */
+    .bg-explore.bg-huntanimal { background: radial-gradient(circle, rgba(139, 195, 74, 0.5) 0%, rgba(56, 142, 60, 0.6) 100%); }
+    .bg-explore.bg-adventure { background: radial-gradient(circle, rgba(255, 193, 7, 0.4) 0%, rgba(121, 85, 72, 0.5) 100%); }
+    .bg-explore.bg-explore { background: radial-gradient(circle, rgba(33, 150, 243, 0.4) 0%, rgba(25, 118, 210, 0.5) 100%); }
+
+    .anim-explore.huntanimal-fire { animation: huntanimalFire 1.4s ease-out; }
+    .anim-explore.adventure-walk { animation: adventureWalk 1.4s linear infinite; }
+    .anim-explore.explore-spin { animation: exploreSpin 1.4s ease-in-out; }
+
+    @keyframes huntanimalFire {
+      0% { transform: scale(1) translateY(0); }
+      30% { transform: scale(1.1) translateY(-10px); }
+      50% { transform: scale(1) translateY(5px); }
+      70% { transform: scale(1.05) translateY(-2px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+    @keyframes adventureWalk {
+      0% { transform: translateX(-5px); }
+      50% { transform: translateX(5px); }
+      100% { transform: translateX(-5px); }
+    }
+    @keyframes exploreSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }

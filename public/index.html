@@ -102,11 +102,31 @@
       </div>
     </div>
 
-    <!-- Skills Preview -->
-    <div class="glass-card" id="skillsCard" style="display:none">
-      <div class="section-title">✨ Skills Kamu</div>
-      <div id="skillsList"></div>
+
+    
+        <div class="dashboard-card">
+      <div class="card-header">🗺️ EXPLORATION</div>
+      <div class="card-body">
+        <div class="action-grid">
+          <button class="action-btn" id="btnHuntAnim" onclick="doExplore('huntanimal')">
+            <span class="action-icon">🏹</span>
+            <span>Hunt Animal</span>
+            <div id="cdHuntAnim" class="cd-text">Siap</div>
+          </button>
+          <button class="action-btn" id="btnAdv" onclick="doExplore('adventure')">
+            <span class="action-icon">🏕️</span>
+            <span>Adventure</span>
+            <div id="cdAdv" class="cd-text">Siap</div>
+          </button>
+          <button class="action-btn" id="btnExp" onclick="doExplore('explore')">
+            <span class="action-icon">🌍</span>
+            <span>Explore</span>
+            <div id="cdExp" class="cd-text">Siap</div>
+          </button>
+        </div>
+      </div>
     </div>
+
 
     <!-- Life Skills -->
     <div id="lifeSkillSection">
@@ -135,6 +155,8 @@
       </div>
       <div class="glass-card" id="lifeLog" style="display:none"></div>
     </div>
+    
+    
 
     <!-- Farm Panel -->
     <div class="glass-card" id="farmPanel" style="display:none">
@@ -261,6 +283,16 @@
     <div class="gather-caption" id="gatherCaption">Melempar kail...</div>
   </div>
 </div>
+
+    <div id="exploreOverlay" class="overlay" style="display: none;">
+      <div class="gather-stage explore-stage">
+        <div id="exploreBg" class="gather-bg bg-explore"></div>
+        <div id="exploreIcon" class="gather-icon anim-explore">🧭</div>
+        <div id="exploreActionIcon" class="gather-action-icon anim-explore">🌍</div>
+        <div id="exploreCaption" class="gather-caption">Tiba di lokasi acak...</div>
+        </div>
+    </div>
+
 
 <script src="app.js"></script>
 </body>

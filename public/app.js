@@ -9,6 +9,7 @@ let currentBattle  = null;
 let currentMode    = null;
 let unlockedSkills = [];
 let isProcessing   = false;
+let skillTimer     = null; // Variabel baru untuk timer cooldown real-time
 
 // ─── DOM SHORTCUTS ───
 const $ = id => document.getElementById(id);
@@ -80,10 +81,11 @@ function showDashboard(data) {
 
     updateCharStats(u);
 
-    // Skills card
-    if (unlockedSkills.length > 0) {
-        $('skillsCard').style.display = '';
-        renderSkillsList(unlockedSkills, u);
+    // ════════════════════════════════════════
+    // FIX: SEMBUNYIKAN SKILL DARI DASHBOARD
+    // ════════════════════════════════════════
+    if ($('skillsCard')) {
+        $('skillsCard').style.display = 'none';
     }
 
     // Check existing battles
@@ -98,11 +100,20 @@ function showDashboard(data) {
             break;
         }
     }
-    if (!hasActive) setStatus('Pilih mode battle untuk mulai!', 'active');
+    
+    if (!hasActive) {
+        setStatus('Pilih mode battle untuk mulai!', 'active');
+        document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false); 
+        isProcessing = false;
+    }
 
-    // Sinkronkan cooldown life-skill dari server (supaya tidak hilang saat refresh)
+    // Sinkronkan cooldown life-skill dari server
     syncGatherCooldowns(u);
+    syncExploreCooldowns(u); // <--- TAMBAHKAN BARIS INI
 }
+
+}
+
 
 function updateCharStats(u) {
     const hpPct   = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
@@ -180,6 +191,7 @@ function resumeBattle(mode, battle, user) {
     currentMode   = mode;
     if (user) currentUser = { ...currentUser, ...user };
     showBattle();
+    isProcessing = false;
 }
 
 // ─── SHOW BATTLE UI ───
@@ -200,6 +212,16 @@ function showBattle() {
         beast: '🐉 ANCIENT BEAST',
         horde: '👹 HORDE INVASION',
     };
+    
+        // ════════════════════════════════════════
+    // FIX: TAMBAHKAN INFO FLOOR SAAT DUNGEON
+    // ════════════════════════════════════════
+    if (mode === 'dungeon') {
+        $('battleModeTag').textContent = `🏰 DUNGEON (Floor ${u.dungeonFloor || 1})`;
+    } else {
+        $('battleModeTag').textContent = modeLabels[mode] || mode.toUpperCase();
+    }
+
 
     $('battleModeTag').textContent = modeLabels[mode] || mode.toUpperCase();
     $('battleTurn').textContent    = `Turn ${b.turn || 1}`;
@@ -226,8 +248,9 @@ function showBattle() {
     const ROLE_EMOJI = { fighter:'⚔️', mage:'🔮', assassin:'🗡️', defender:'🛡️', archer:'🏹', wraith:'💀', alchemist:'⚗️' };
     $('playerRoleTag').textContent = ROLE_EMOJI[u.role] || '⚔️';
 
-    // Skills in battle
+    // Skills in battle (sudah dimodifikasi untuk Real-Time)
     renderBattleSkills(u);
+    startSkillCooldownTimer(); // Panggil fungsi real-time loop!
 
     // Potion count
     updatePotionCount(u);
@@ -267,6 +290,7 @@ function updatePotionCount(u) {
     $('potionBtn').disabled = count < 1;
 }
 
+// ─── FUNGSI RENDER SKILL DENGAN DATA ATRIBUT (UNTUK REALTIME) ───
 function renderBattleSkills(u) {
     if (!unlockedSkills || unlockedSkills.length === 0) {
         $('battleSkillsSection').style.display = 'none';
@@ -284,16 +308,58 @@ function renderBattleSkills(u) {
         const cdText = onCd ? `<span class="skill-btn-cd">⏳ ${cdSec}s</span>`
                       : noMana ? `<span class="skill-btn-cd">💧 ${s.mana}MP</span>`
                       : `<span class="skill-btn-ready">✅ READY</span>`;
+                      
+        // Penambahan atribut data-cdend dan data-mana untuk sistem realtime timer
         return `
-        <button class="skill-btn" onclick="doSkill('${s.name}')" ${dis ? 'disabled' : ''}>
+        <button class="skill-btn" data-cdend="${cdEnd}" data-mana="${s.mana}" onclick="doSkill('${s.name}')" ${dis ? 'disabled' : ''}>
           <span class="skill-btn-name">
             ✨ ${s.name}
             <span class="skill-btn-desc">${s.description || ''}</span>
           </span>
           <span class="skill-btn-mana">💧${s.mana}</span>
-          ${cdText}
+          <div class="skill-status-wrapper">${cdText}</div>
         </button>`;
     }).join('');
+}
+
+// ─── FUNGSI LOOP REALTIME COOLDOWN ───
+function startSkillCooldownTimer() {
+    if (skillTimer) clearInterval(skillTimer);
+
+    skillTimer = setInterval(() => {
+        // Hentikan proses jika sedang tidak di layar battle
+        if ($('battleSection').style.display === 'none') {
+            clearInterval(skillTimer);
+            return;
+        }
+
+        const now = Date.now();
+        const skillBtns = document.querySelectorAll('.skill-btn');
+        const u = currentUser;
+
+        skillBtns.forEach(btn => {
+            let cdEnd = parseInt(btn.getAttribute('data-cdend')) || 0;
+            let manaReq = parseInt(btn.getAttribute('data-mana')) || 0;
+            let statusWrapper = btn.querySelector('.skill-status-wrapper');
+
+            let onCd = now < cdEnd;
+            let noMana = (u && u.mana < manaReq);
+
+            if (onCd) {
+                let cdSec = Math.ceil((cdEnd - now) / 1000);
+                if (statusWrapper) statusWrapper.innerHTML = `<span class="skill-btn-cd">⏳ ${cdSec}s</span>`;
+                btn.disabled = true;
+            } else if (noMana) {
+                if (statusWrapper) statusWrapper.innerHTML = `<span class="skill-btn-cd">💧 ${manaReq}MP</span>`;
+                // Kunci tombol kecuali sedang tidak processing API
+                if (!isProcessing) btn.disabled = true; 
+            } else {
+                if (statusWrapper) statusWrapper.innerHTML = `<span class="skill-btn-ready">✅ READY</span>`;
+                // Nyalakan kembali tombol hanya jika tidak sedang menunggu balasan API
+                if (!isProcessing) btn.disabled = false;
+            }
+        });
+    }, 1000);
 }
 
 // ─── DO ACTIONS ───
@@ -352,7 +418,16 @@ async function doAction(action, skillName = null) {
                 $('monsterName').textContent  = data.battle.monster?.name  || '???';
                 $('monsterStatus').textContent = data.battle.isBossWave ? '⚠️ BOSS WAVE' : '';
             }
+        } 
+        // ════════════════════════════════════════
+        // FIX BUG: Paksa bar HP jadi 0 jika 1-hit kill
+        // ════════════════════════════════════════
+        else if (data.turnResult === 'win' || data.turnResult === 'horde_complete') {
+            // Ambil Max HP dari data turn sebelumnya sebelum di-null-kan oleh server
+            let maxHpVisual = currentBattle ? currentBattle.monsterMaxHp : 100;
+            updateMonsterHp(0, maxHpVisual);
         }
+
 
         // Handle result
         switch (data.turnResult) {
@@ -411,7 +486,11 @@ function enableActions(enabled) {
             b.disabled = !enabled;
         }
     });
-    document.querySelectorAll('.skill-btn').forEach(b => b.disabled = !enabled);
+    // HANYA disabled tombol skill jika CD tidak sedang running. Jika enabled dipanggil = false (tombol mati), matikan semua. 
+    // Tapi jika dipanggil = true (tombol nyala), biarkan interval timer yang nyalain sendiri berdasarkan cooldown.
+    if (!enabled) {
+        document.querySelectorAll('.skill-btn').forEach(b => b.disabled = true);
+    }
 }
 
 // ─── SHOW RESULT ───
@@ -472,8 +551,20 @@ async function endBattle() {
     } catch {
         showDashboard({ user: currentUser, roleInfo: null, unlockedSkills, battles: {} });
     }
+    
+    // ===============================================
+    // PERBAIKAN BUG MACET SAAT KEMBALI KE LOBBY
+    // ===============================================
     currentBattle = null;
     currentMode   = null;
+    isProcessing  = false; // Membuka gembok tindakan
+    
+    // Pastikan timer dihentikan agar tidak bocor dan berjalan di latar belakang
+    if (skillTimer) clearInterval(skillTimer);
+    
+    // Buka kembali interaksi semua tombol di dashboard (lobby)
+    document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+    enableActions(true);
 }
 
 // ─── LOGOUT ───
@@ -488,6 +579,10 @@ function logout() {
     $('battleSection').style.display   = 'none';
     $('loginBtn').disabled = false;
     $('senderIdInput').value = '';
+    
+    if (skillTimer) clearInterval(skillTimer);
+    isProcessing = false;
+    
     setStatus('Masukkan ID WhatsApp untuk memulai...');
 }
 
@@ -510,9 +605,6 @@ const GATHER_LAST_FIELD = { mine: 'lastMining', chop: 'lastWood', fish: 'lastFis
 
 function senderId() { return currentUser?.senderId; }
 
-// Dipanggil setiap kali karakter di-load (termasuk setelah refresh) supaya
-// cooldown mine/chop/fish tetap akurat berdasarkan timestamp dari server,
-// bukan cuma timer JS yang ke-reset waktu page reload.
 function syncGatherCooldowns(u) {
     const now = Date.now();
     Object.entries(GATHER_LABEL).forEach(([type, info]) => {
@@ -559,7 +651,6 @@ async function doGather(type) {
 
     showGatherOverlay(type);
     const info = GATHER_LABEL[type];
-    // Minimal durasi animasi biar ada "suspense", sambil request jalan paralel
     const animDelay = new Promise(r => setTimeout(r, 1400));
 
     try {
@@ -571,7 +662,6 @@ async function doGather(type) {
 
         const [, data] = await Promise.all([animDelay, fetchPromise]);
 
-        // Fishing punya "sentakan" sesaat sebelum reveal hasil
         if (type === 'fish') {
             $('gatherActionIcon').classList.add('fish-bite');
             await new Promise(r => setTimeout(r, 500));
@@ -619,7 +709,6 @@ async function doGather(type) {
             currentUser = { ...currentUser, ...data.user };
             updateCharStats(currentUser);
             $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
-            // Sinkronkan ulang cooldown dari timestamp server (bukan hanya timer JS lokal)
             syncGatherCooldowns(currentUser);
         }
 
@@ -773,6 +862,190 @@ async function doHarvestAll() {
         renderFarm(data.farm);
     } catch (e) { showLifeLog('❌ Gagal memanen.'); }
 }
+
+// ════════════════════════════════════════
+//  EXPLORATION — Hunt Animal / Adventure / Explore
+// ════════════════════════════════════════
+const EXPLORE_LABEL = {
+    huntanimal: { title: 'Hunting Animal', cd: 30 },
+    adventure: { title: 'Adventure', cd: 60 },
+    explore: { title: 'Exploring World', cd: 120 },
+};
+let exploreBusy = {};
+const exploreTimers = {};
+const EXPLORE_LAST_FIELD = { huntanimal: 'lastHuntAnimal', adventure: 'lastTreasure', explore: 'lastExplore' };
+
+// Panggil fungsi ini di dalam showDashboard() dan doExplore()
+function syncExploreCooldowns(u) {
+    const now = Date.now();
+    Object.entries(EXPLORE_LABEL).forEach(([type, info]) => {
+        const last = u[EXPLORE_LAST_FIELD[type]] || 0;
+        const cdMs = info.cd * 1000;
+        const elapsed = now - last;
+        if (last && elapsed < cdMs) {
+            const secondsLeft = Math.ceil((cdMs - elapsed) / 1000);
+            startExploreCooldown(type, secondsLeft);
+        } else {
+            exploreBusy[type] = false;
+            const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
+            const label = $(type === 'huntanimal' ? 'cdHuntAnim' : type === 'adventure' ? 'cdAdv' : 'cdExp');
+            if (btn) btn.disabled = false;
+            if (label) label.textContent = 'Siap';
+        }
+    });
+}
+
+function startExploreCooldown(type, seconds) {
+    exploreBusy[type] = true;
+    const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
+    const label = $(type === 'huntanimal' ? 'cdHuntAnim' : type === 'adventure' ? 'cdAdv' : 'cdExp');
+    if (btn) btn.disabled = true;
+    let left = seconds;
+
+    if (exploreTimers[type]) clearInterval(exploreTimers[type]);
+    if (label) label.textContent = `⏳ ${left}s`;
+    
+    exploreTimers[type] = setInterval(() => {
+        left--;
+        if (left <= 0) {
+            clearInterval(exploreTimers[type]);
+            exploreBusy[type] = false;
+            if (btn) btn.disabled = false;
+            if (label) label.textContent = 'Siap';
+        } else {
+            if (label) label.textContent = `⏳ ${left}s`;
+        }
+    }, 1000);
+}
+
+// ════════════════════════════════════════
+// FUNGSI DO EXPLORE DENGAN ANIMASI
+// ════════════════════════════════════════
+async function doExplore(type) {
+    if (!currentUser) return;
+    if (exploreBusy[type]) return;
+    
+    const btn = $(type === 'huntanimal' ? 'btnHuntAnim' : type === 'adventure' ? 'btnAdv' : 'btnExp');
+    btn.disabled = true;
+    
+    // 1. Tampilkan Overlay Animasi
+    showExploreOverlay(type);
+    const info = EXPLORE_LABEL[type];
+    const animDelay = new Promise(r => setTimeout(r, 1400)); // Simulasi waktu perjalanan/perburuan
+
+    try {
+        // Jalankan fetch concurrently dengan delay animasi visual
+        const fetchPromise = fetch('/api/explore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentUser.senderId, type }),
+        }).then(r => r.json());
+
+        const [, data] = await Promise.all([animDelay, fetchPromise]);
+
+        // 2. Beri efek "Result Pop" ke overlay
+        const stage = document.querySelector('.gather-stage.explore-stage');
+        stage.classList.add('result-pop');
+
+        if (!data.ok) {
+            $('exploreIcon').textContent = '❌';
+            $('exploreCaption').textContent = data.error;
+            $('exploreActionIcon').style.display = 'none';
+            await new Promise(r => setTimeout(r, 1300));
+            hideExploreOverlay();
+            showLifeLog(`❌ ${data.error}`);
+            btn.disabled = false;
+            return;
+        }
+
+        // 3. Tampilkan Hasil ke Overlay
+        let primaryRewardHtml = '';
+        let primaryRewardIcon = '';
+
+        if (type === 'huntanimal' && data.rewards.length > 0) {
+            let meatReward = data.rewards.find(r => r.includes('MEAT'));
+            if (meatReward) {
+                primaryRewardHtml = meatReward;
+                primaryRewardIcon = REWARD_EMOJI[meatReward.split('x ')[1].toLowerCase().replace(/\s/g, '_')] || EXPLORE_ICON[type];
+            }
+        } else if (type === 'explore' && data.rewards.length > 0) {
+            primaryRewardHtml = data.rewards[0]; // Drop material
+            primaryRewardIcon = REWARD_EMOJI[primaryRewardHtml.split('x ')[1].toLowerCase().replace(/\s/g, '_')] || EXPLORE_ICON[type];
+        } else if (type === 'adventure') {
+             primaryRewardHtml = `Gold +${fmt(data.totalGold)}`;
+             primaryRewardIcon = '💰';
+        }
+
+        $('exploreIcon').textContent = EXPLORE_ICON[type];
+        $('exploreActionIcon').textContent = primaryRewardIcon;
+        $('exploreCaption').textContent = primaryRewardHtml;
+        $('exploreActionIcon').style.display = '';
+
+        const resultEl = document.createElement('div');
+        resultEl.className = 'gather-result-text';
+        if (data.totalExp > 0) resultEl.innerHTML += `✨ +${fmt(data.totalExp)} EXP<br>`;
+        if (type === 'adventure' && data.totalGold > 0) resultEl.innerHTML += `💰 +${fmt(data.totalGold)} Gold<br>`;
+        document.querySelector('.gather-stage.explore-stage').appendChild(resultEl);
+
+        // 4. Update Stats User dan Cooldown
+        currentUser = { ...currentUser, ...data.user };
+        updateCharStats(currentUser);
+        $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
+
+        // Tampilkan hasil lengkap ke LifeLog juga
+        let logHtml = `🧭 <b>${EXPLORE_LABEL[type].title} Selesai!</b><br>`;
+        data.rewards.forEach(r => logHtml += `• ${r}<br>`);
+        if (data.totalExp > 0) logHtml += `✨ Exp: +${fmt(data.totalExp)}<br>`;
+        if (data.totalGold > 0) logHtml += `💰 Gold: +${fmt(data.totalGold)}<br>`;
+        if (data.durabilityLogs && data.durabilityLogs.length > 0) {
+            data.durabilityLogs.forEach(msg => logHtml += `<span class="warn-text">${msg}</span><br>`);
+        }
+        showLifeLog(logHtml);
+
+        startExploreCooldown(type, EXPLORE_LABEL[type].cd);
+
+        // 5. Tunggu sebentar agar hasil bisa dibaca sebelum overlay hilang
+        await new Promise(r => setTimeout(r, 1600));
+        hideExploreOverlay();
+
+    } catch (e) {
+        hideExploreOverlay();
+        showLifeLog('❌ Gagal terhubung ke server.');
+        btn.disabled = false;
+    }
+}
+
+// ─── HELPER FUNGSI FUNGSI OVERLAY EXPLORE ───
+const EXPLORE_ICON = { huntanimal: '🏹', adventure: '🏕️', explore: '🌍' };
+
+function showExploreOverlay(type) {
+    const info = GATHER_LABEL[type === 'huntanimal' ? 'chop' : 'mine']; // Pinjam caption default biar ga ribet
+    const stage = document.querySelector('.gather-stage.explore-stage');
+    stage.classList.remove('result-pop');
+    
+    // Set tema overlay
+    $('exploreBg').className = `gather-bg bg-explore bg-${type}`;
+    $('exploreIcon').textContent = EXPLORE_ICON[type];
+    $('exploreIcon').className = `gather-icon anim-explore ${type === 'huntanimal' ? 'huntanimal-fire' : type === 'adventure' ? 'adventure-walk' : 'explore-spin'}`;
+    $('exploreActionIcon').style.display = 'none'; // Sembunyikan icon aksi dulu
+    
+    // Set caption sesuai tipe
+    let captionText = 'Tiba di lokasi acak...';
+    if (type === 'huntanimal') captionText = 'Membidik hewan buruan...';
+    if (type === 'adventure') captionText = 'Menjelajahi lokasi tak dikenal...';
+    $('exploreCaption').textContent = captionText;
+
+    // Bersihkan hasil lama
+    const oldResult = document.querySelector('.gather-result-text');
+    if (oldResult) oldResult.remove();
+    
+    $('exploreOverlay').style.display = 'flex';
+}
+
+function hideExploreOverlay() {
+    $('exploreOverlay').style.display = 'none';
+}
+
 
 // ─── AUTO-LOGIN (from localStorage) ───
 window.addEventListener('DOMContentLoaded', () => {
