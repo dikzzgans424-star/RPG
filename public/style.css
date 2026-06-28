@@ -1215,3 +1215,236 @@ body::after {
     letter-spacing: .5px;
 }
 .btn-sell-all-big:hover { opacity: .85; }
+
+/* ══════════════════════════════════════
+   ACTIVITY ANIMATION OVERLAY
+══════════════════════════════════════ */
+
+@keyframes actOverlayIn {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+@keyframes actOverlayOut {
+  from { opacity:1; transform:scale(1); }
+  to   { opacity:0; transform:scale(1.04); }
+}
+@keyframes actPanelSlideIn {
+  from { opacity:0; transform:translateY(28px) scale(.96); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes actIconBounce {
+  0%   { transform:scale(0.6) rotate(-12deg); opacity:0; }
+  60%  { transform:scale(1.18) rotate(4deg); opacity:1; }
+  80%  { transform:scale(.94) rotate(-2deg); }
+  100% { transform:scale(1) rotate(0deg); }
+}
+@keyframes actStepIn {
+  from { opacity:0; transform:translateX(-12px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+@keyframes actResultIn {
+  from { opacity:0; transform:translateY(14px) scale(.92); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes actGlow {
+  0%,100% { text-shadow: 0 0 8px rgba(201,150,60,0.4); }
+  50%      { text-shadow: 0 0 22px rgba(201,150,60,0.9), 0 0 40px rgba(201,150,60,0.3); }
+}
+@keyframes actShimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+@keyframes actSparkle {
+  0%   { opacity:0; transform:scale(0) rotate(0deg); }
+  40%  { opacity:1; transform:scale(1.3) rotate(180deg); }
+  100% { opacity:0; transform:scale(0) rotate(360deg) translateY(-30px); }
+}
+@keyframes actRarePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(192,132,252,0.4); }
+  50%      { box-shadow: 0 0 0 10px rgba(192,132,252,0); }
+}
+@keyframes actProgressFill {
+  from { width:0%; }
+  to   { width:100%; }
+}
+@keyframes actBarPulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.6; }
+}
+@keyframes floatUp {
+  0%   { opacity:1; transform:translateY(0) scale(1); }
+  100% { opacity:0; transform:translateY(-60px) scale(1.2); }
+}
+
+/* Backdrop */
+#actOverlay {
+  position:fixed; inset:0; z-index:9000;
+  background:rgba(4,4,12,0.88);
+  backdrop-filter:blur(6px);
+  display:flex; align-items:center; justify-content:center;
+  animation:actOverlayIn .25s ease;
+}
+#actOverlay.closing {
+  animation:actOverlayOut .3s ease forwards;
+  pointer-events:none;
+}
+
+/* Main card */
+.act-panel {
+  width:min(88vw, 340px);
+  background: linear-gradient(160deg, #16162a 0%, #0f0f1e 100%);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:22px;
+  padding:28px 22px 22px;
+  position:relative;
+  overflow:hidden;
+  animation:actPanelSlideIn .35s cubic-bezier(.22,1,.36,1);
+}
+.act-panel::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--act-color, #c9963c), transparent);
+}
+
+/* Big icon */
+.act-icon-wrap {
+  text-align:center;
+  margin-bottom:14px;
+}
+.act-icon {
+  font-size:56px;
+  display:inline-block;
+  animation:actIconBounce .55s cubic-bezier(.34,1.56,.64,1);
+  filter:drop-shadow(0 0 14px var(--act-color, #c9963c));
+}
+
+/* Title */
+.act-title {
+  font-family:var(--font-display);
+  font-size:16px; font-weight:700;
+  color:var(--gold);
+  text-align:center;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  margin-bottom:18px;
+  animation:actGlow 2s ease infinite;
+}
+
+/* Progress bar */
+.act-progress-wrap {
+  background:rgba(255,255,255,0.06);
+  border-radius:99px;
+  height:4px;
+  margin-bottom:18px;
+  overflow:hidden;
+}
+.act-progress-bar {
+  height:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg, var(--act-color,#c9963c), var(--act-color2,#e8c06a));
+  animation:actProgressFill var(--act-duration,2.4s) linear forwards,
+            actBarPulse 0.6s ease infinite;
+}
+
+/* Step list */
+.act-steps {
+  display:flex; flex-direction:column; gap:8px;
+  margin-bottom:18px;
+  min-height:72px;
+}
+.act-step {
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--font-body);
+  font-size:13px; color:var(--text-secondary);
+  animation:actStepIn .35s ease both;
+}
+.act-step.done { color:var(--text-primary); }
+.act-step-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,0.15);
+  transition:background .3s, box-shadow .3s;
+}
+.act-step.done .act-step-dot {
+  background:var(--act-color,#c9963c);
+  box-shadow:0 0 8px var(--act-color,#c9963c);
+}
+.act-step.active .act-step-dot {
+  background:var(--act-color,#c9963c);
+  box-shadow:0 0 8px var(--act-color,#c9963c);
+  animation:actBarPulse .6s ease infinite;
+}
+.act-step.active { color:var(--text-primary); }
+
+/* Result box */
+.act-result {
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  padding:14px 16px;
+  animation:actResultIn .4s cubic-bezier(.22,1,.36,1);
+  position:relative; overflow:hidden;
+}
+.act-result.rare {
+  border-color:rgba(192,132,252,0.3);
+  background:rgba(192,132,252,0.05);
+  animation:actResultIn .4s cubic-bezier(.22,1,.36,1),
+            actRarePulse 1.5s ease infinite .4s;
+}
+.act-result-row {
+  display:flex; justify-content:space-between; align-items:center;
+  font-family:var(--font-body); font-size:13px;
+  color:var(--text-secondary);
+  margin-bottom:6px;
+}
+.act-result-row:last-child { margin-bottom:0; }
+.act-result-row .val {
+  color:var(--gold); font-weight:700;
+}
+.act-result-row .val.green { color:#3da870; }
+.act-result-row .val.purple { color:#c084fc; }
+.act-result-title {
+  font-family:var(--font-display);
+  font-size:11px; letter-spacing:2px;
+  color:var(--text-muted); text-transform:uppercase;
+  margin-bottom:10px;
+}
+
+/* Rare shimmer overlay */
+.act-result.rare::after {
+  content:'';
+  position:absolute; inset:0;
+  background:linear-gradient(105deg,
+    transparent 30%,
+    rgba(192,132,252,0.08) 50%,
+    transparent 70%);
+  background-size:200% 100%;
+  animation:actShimmer 2s linear infinite;
+}
+
+/* Float-up reward particles */
+.act-float {
+  position:fixed;
+  font-size:22px;
+  pointer-events:none;
+  z-index:9100;
+  animation:floatUp .9s ease forwards;
+}
+
+/* Sparkle stars */
+.act-sparkle {
+  position:absolute;
+  font-size:14px;
+  pointer-events:none;
+  animation:actSparkle .8s ease forwards;
+}
+
+/* Level up badge */
+.act-levelup {
+  text-align:center;
+  font-family:var(--font-display);
+  font-size:13px; font-weight:700;
+  color:#fbbf24;
+  letter-spacing:1px;
+  margin-top:10px;
+  animation:actGlow 1s ease infinite;
+}

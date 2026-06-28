@@ -183,12 +183,17 @@ function resumeBattle(mode, battle, user) {
 }
 
 // ─── SHOW BATTLE UI ───
+let battleCdTimer = null;
+
 function showBattle() {
+    if (battleCdTimer) { clearInterval(battleCdTimer); battleCdTimer = null; }
     $('loginSection').style.display    = 'none';
     $('dashboardSection').style.display = 'none';
     $('battleSection').style.display   = '';
     $('backBtn').style.display         = 'none';
     $('battleSection').querySelector('.result-overlay')?.remove();
+    // Reset semua tombol action agar tidak stuck disabled dari battle sebelumnya
+    document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
 
     const b    = currentBattle;
     const u    = currentUser;
@@ -237,6 +242,31 @@ function showBattle() {
 
     setStatus(`Battle ${currentMode} aktif!`, 'active');
     enableActions(true);
+
+    // ─── Live CD countdown untuk skill di battle ───
+    battleCdTimer = setInterval(() => {
+        if (!currentUser || !currentBattle) return;
+        const now2 = Date.now();
+        document.querySelectorAll('#battleSkillsRow .skill-btn').forEach(btn => {
+            const cdSpan = btn.querySelector('.skill-btn-cd');
+            if (!cdSpan) return;
+            const match = cdSpan.textContent.match(/(\d+)s/);
+            if (!match) return;
+            const skillNameEl = btn.querySelector('.skill-btn-name');
+            if (!skillNameEl) return;
+            const sName = skillNameEl.childNodes[0]?.textContent?.replace('✨ ', '').trim();
+            if (!sName) return;
+            const cdEnd = currentUser.cooldowns?.[sName] || 0;
+            const remaining = Math.ceil((cdEnd - now2) / 1000);
+            if (remaining <= 0) {
+                // CD habis — re-render skills
+                renderBattleSkills(currentUser);
+                if (!isProcessing) enableActions(true);
+            } else {
+                cdSpan.textContent = `⏳ ${remaining}s`;
+            }
+        });
+    }, 1000);
 }
 
 function updateMonsterHp(hp, maxHp) {
@@ -457,6 +487,8 @@ function showResult(type, reward) {
 
 // ─── END BATTLE / BACK ───
 async function endBattle() {
+    isProcessing = false;  // Reset agar battle berikutnya bisa dimulai
+    if (battleCdTimer) { clearInterval(battleCdTimer); battleCdTimer = null; }
     // Refresh character from server then go to dashboard
     try {
         setStatus('Memuat karakter...', 'active');
@@ -775,6 +807,101 @@ async function doHarvestAll() {
 }
 
 // ════════════════════════════════════════
+//  ACTIVITY ANIMATION ENGINE
+// ════════════════════════════════════════
+
+function showActivityAnim({ icon, title, color, color2, steps, duration }) {
+    // Remove old overlay if any
+    document.getElementById('actOverlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'actOverlay';
+    overlay.innerHTML = `
+        <div class="act-panel" style="--act-color:${color};--act-color2:${color2||color};--act-duration:${duration||2.4}s">
+            <div class="act-icon-wrap"><span class="act-icon">${icon}</span></div>
+            <div class="act-title">${title}</div>
+            <div class="act-progress-wrap"><div class="act-progress-bar"></div></div>
+            <div class="act-steps" id="actSteps"></div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    // Animate steps
+    const stepsEl = document.getElementById('actSteps');
+    const stepDelay = (duration * 1000) / (steps.length + 1);
+    steps.forEach((text, i) => {
+        const div = document.createElement('div');
+        div.className = 'act-step';
+        div.style.animationDelay = `${stepDelay * i}ms`;
+        div.innerHTML = `<div class="act-step-dot"></div><span>${text}</span>`;
+        stepsEl.appendChild(div);
+
+        setTimeout(() => {
+            div.classList.add('active');
+            // Mark previous as done
+            if (i > 0) stepsEl.children[i-1].classList.remove('active');
+            if (i > 0) stepsEl.children[i-1].classList.add('done');
+        }, stepDelay * i);
+    });
+    // Mark last step done at end
+    setTimeout(() => {
+        const last = stepsEl.lastElementChild;
+        if (last) { last.classList.remove('active'); last.classList.add('done'); }
+    }, stepDelay * steps.length);
+
+    return overlay;
+}
+
+function showActivityResult(overlay, { isRare, rows, levelUp }) {
+    const panel = overlay.querySelector('.act-panel');
+
+    // Build result HTML
+    const resultEl = document.createElement('div');
+    resultEl.className = `act-result${isRare ? ' rare' : ''}`;
+    resultEl.innerHTML = `<div class="act-result-title">✦ HASIL ✦</div>` +
+        rows.map(r => `<div class="act-result-row"><span>${r.label}</span><span class="val ${r.cls||''}">${r.val}</span></div>`).join('');
+    if (levelUp) {
+        const lvlEl = document.createElement('div');
+        lvlEl.className = 'act-levelup';
+        lvlEl.textContent = levelUp;
+        resultEl.appendChild(lvlEl);
+    }
+    panel.appendChild(resultEl);
+
+    // Sparkles if rare
+    if (isRare) {
+        ['✨','⭐','💫','🌟'].forEach((s, i) => {
+            const sp = document.createElement('div');
+            sp.className = 'act-sparkle';
+            sp.textContent = s;
+            sp.style.cssText = `left:${15+i*22}%;top:${20+Math.sin(i)*30}%;animation-delay:${i*0.15}s`;
+            resultEl.appendChild(sp);
+        });
+    }
+
+    // Float-up reward emojis
+    const floatEmojis = rows.filter(r => r.float).map(r => r.float);
+    floatEmojis.forEach((em, i) => {
+        setTimeout(() => {
+            const el = document.createElement('div');
+            el.className = 'act-float';
+            el.textContent = em;
+            el.style.cssText = `left:${30 + i*18}vw; top:65vh;`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }, i * 120);
+    });
+
+    // Close on tap after showing result
+    overlay.addEventListener('click', () => closeActivityAnim(overlay), { once: true });
+}
+
+function closeActivityAnim(overlay) {
+    if (!overlay) return;
+    overlay.classList.add('closing');
+    setTimeout(() => overlay?.remove(), 320);
+}
+
+// ════════════════════════════════════════
 //  EXPLORE
 // ════════════════════════════════════════
 let exploreCoolTimer = null;
@@ -788,14 +915,14 @@ function syncExploreCooldown(user) {
     clearInterval(exploreCoolTimer);
     if (sisa <= 0) {
         btn.disabled = false;
-        btn.textContent = '🌍 Explore!';
+        btn.innerHTML = '<div class="mode-icon">🌍</div><div class="mode-name">Explore</div><div class="mode-desc">CD: 2 menit</div>';
         return;
     }
     btn.disabled = true;
     const tick = () => {
         const s = Math.ceil((EXPLORE_CD_MS - (Date.now() - last)) / 1000);
-        if (s <= 0) { clearInterval(exploreCoolTimer); btn.disabled = false; btn.textContent = '🌍 Explore!'; }
-        else btn.textContent = `⏳ ${s}s`;
+        if (s <= 0) { clearInterval(exploreCoolTimer); btn.disabled = false; btn.innerHTML = '<div class="mode-icon">🌍</div><div class="mode-name">Explore</div><div class="mode-desc">CD: 2 menit</div>'; }
+        else btn.innerHTML = `<div class="mode-icon">⏳</div><div class="mode-name">Explore</div><div class="mode-desc">CD: ${s}s</div>`;
     };
     tick();
     exploreCoolTimer = setInterval(tick, 1000);
@@ -805,7 +932,13 @@ async function doExplore() {
     if (!currentUser) return;
     const btn = $('btnExplore');
     btn.disabled = true;
-    showLifeLog('🌍 Sedang menjelajahi...');
+
+    const overlay = showActivityAnim({
+        icon: '🌍', title: 'Menjelajahi Dunia',
+        color: '#38a89d', color2: '#5ecdc2', duration: 2.6,
+        steps: ['Memasuki wilayah baru...', 'Menjelajahi area...', 'Menemukan sesuatu...']
+    });
+
     try {
         const res  = await fetch('/api/explore', {
             method: 'POST',
@@ -813,7 +946,11 @@ async function doExplore() {
             body: JSON.stringify({ senderId: senderId() }),
         });
         const data = await res.json();
+
+        await new Promise(r => setTimeout(r, 2600)); // tunggu animasi selesai
+
         if (!data.ok) {
+            closeActivityAnim(overlay);
             showLifeLog(`❌ ${data.error}`);
             if (data.cooldownLeft) {
                 currentUser.lastExplore = Date.now() - (EXPLORE_CD_MS - data.cooldownLeft * 1000);
@@ -825,6 +962,19 @@ async function doExplore() {
         updateCharStats(currentUser);
         $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
 
+        const lvlUp = data.levelUpLog?.length ? `🎉 LEVEL UP! → Lv${currentUser.level}` : null;
+        showActivityResult(overlay, {
+            isRare: !!data.rare,
+            rows: [
+                { label: `📍 ${data.location}`, val: '', cls: '' },
+                { label: '💰 Gold', val: `+${fmt(data.gold)}`, cls: '', float: '💰' },
+                { label: '✨ EXP',  val: `+${fmt(data.exp)}`,  cls: 'green', float: '✨' },
+                { label: '📦 Item', val: `${data.drop.qty}x ${data.drop.key}` },
+                ...(data.rare ? [{ label: '⭐ RARE', val: data.rare.name, cls: 'purple', float: '⭐' }] : [])
+            ],
+            levelUp: lvlUp
+        });
+
         let log = `🌍 <b>${data.location}</b><br>💰 +${fmt(data.gold)} Gold | ✨ +${fmt(data.exp)} EXP<br>📦 ${data.drop.qty}x ${data.drop.key}`;
         if (data.rare) log += `<br>✨ <b>RARE!</b> 1x ${data.rare.name}`;
         if (data.levelUpLog?.length) log += `<br>` + data.levelUpLog.map(l => `🎉 ${l.text || l}`).join('<br>');
@@ -832,6 +982,7 @@ async function doExplore() {
 
         syncExploreCooldown(currentUser);
     } catch (e) {
+        closeActivityAnim(overlay);
         showLifeLog('❌ Koneksi gagal.');
         btn.disabled = false;
     }
@@ -849,12 +1000,12 @@ function syncAdvCooldown(user) {
     const btn  = $('btnAdv');
     if (!btn) return;
     clearInterval(advCoolTimer);
-    if (sisa <= 0) { btn.disabled = false; btn.textContent = '🏞️ Petualang!'; return; }
+    if (sisa <= 0) { btn.disabled = false; btn.innerHTML = '<div class="mode-icon">🏞️</div><div class="mode-name">Adventure</div><div class="mode-desc">CD: 1 menit</div>'; return; }
     btn.disabled = true;
     const tick = () => {
         const s = Math.ceil((ADV_CD_MS - (Date.now() - last)) / 1000);
-        if (s <= 0) { clearInterval(advCoolTimer); btn.disabled = false; btn.textContent = '🏞️ Petualang!'; }
-        else btn.textContent = `⏳ ${s}s`;
+        if (s <= 0) { clearInterval(advCoolTimer); btn.disabled = false; btn.innerHTML = '<div class="mode-icon">🏞️</div><div class="mode-name">Adventure</div><div class="mode-desc">CD: 1 menit</div>'; }
+        else btn.innerHTML = `<div class="mode-icon">⏳</div><div class="mode-name">Adventure</div><div class="mode-desc">CD: ${s}s</div>`;
     };
     tick();
     advCoolTimer = setInterval(tick, 1000);
@@ -864,7 +1015,13 @@ async function doAdventure() {
     if (!currentUser) return;
     const btn = $('btnAdv');
     btn.disabled = true;
-    showLifeLog('🏞️ Berpetualang...');
+
+    const overlay = showActivityAnim({
+        icon: '🏞️', title: 'Berpetualang',
+        color: '#c9963c', color2: '#e8c06a', duration: 2.2,
+        steps: ['Berangkat menuju hutan...', 'Menghadapi rintangan...', 'Menyelesaikan petualangan!']
+    });
+
     try {
         const res  = await fetch('/api/adventure', {
             method: 'POST',
@@ -872,7 +1029,11 @@ async function doAdventure() {
             body: JSON.stringify({ senderId: senderId() }),
         });
         const data = await res.json();
+
+        await new Promise(r => setTimeout(r, 2200));
+
         if (!data.ok) {
+            closeActivityAnim(overlay);
             showLifeLog(`❌ ${data.error}`);
             if (data.cooldownLeft) {
                 currentUser.lastTreasure = Date.now() - (ADV_CD_MS - data.cooldownLeft * 1000);
@@ -884,6 +1045,18 @@ async function doAdventure() {
         updateCharStats(currentUser);
         $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
 
+        const lvlUp = data.levelUpLog?.length ? `🎉 LEVEL UP! → Lv${currentUser.level}` : null;
+        showActivityResult(overlay, {
+            isRare: false,
+            rows: [
+                { label: `🐾 ${data.event || 'Petualangan'}`, val: '' },
+                { label: '💰 Gold', val: `+${fmt(data.gold)}`, float: '💰' },
+                { label: '✨ EXP',  val: `+${fmt(data.exp)}`,  cls: 'green', float: '✨' },
+                { label: '💔 HP',   val: `-${data.hpLoss}` },
+            ],
+            levelUp: lvlUp
+        });
+
         let log = `🐾 Kamu <b>${data.event}</b><br>💰 +${fmt(data.gold)} Gold | ✨ +${fmt(data.exp)} EXP | 💔 ${data.hpLoss} HP`;
         if (data.durabilityLogs?.length) log += '<br>' + data.durabilityLogs.join('<br>');
         if (data.levelUpLog?.length) log += '<br>' + data.levelUpLog.map(l => `🎉 ${l.text || l}`).join('<br>');
@@ -891,6 +1064,7 @@ async function doAdventure() {
 
         syncAdvCooldown(currentUser);
     } catch (e) {
+        closeActivityAnim(overlay);
         showLifeLog('❌ Koneksi gagal.');
         btn.disabled = false;
     }
@@ -908,12 +1082,12 @@ function syncHuntAnimalCooldown(user) {
     const btn  = $('btnHuntAnimal');
     if (!btn) return;
     clearInterval(huntAnimalCoolTimer);
-    if (sisa <= 0) { btn.disabled = false; btn.textContent = '🏹 Berburu!'; return; }
+    if (sisa <= 0) { btn.disabled = false; btn.innerHTML = '<div class="mode-icon">🏹</div><div class="mode-name">Berburu</div><div class="mode-desc">CD: 30 detik</div>'; return; }
     btn.disabled = true;
     const tick = () => {
         const s = Math.ceil((HUNT_ANIMAL_CD_MS - (Date.now() - last)) / 1000);
-        if (s <= 0) { clearInterval(huntAnimalCoolTimer); btn.disabled = false; btn.textContent = '🏹 Berburu!'; }
-        else btn.textContent = `⏳ ${s}s`;
+        if (s <= 0) { clearInterval(huntAnimalCoolTimer); btn.disabled = false; btn.innerHTML = '<div class="mode-icon">🏹</div><div class="mode-name">Berburu</div><div class="mode-desc">CD: 30 detik</div>'; }
+        else btn.innerHTML = `<div class="mode-icon">⏳</div><div class="mode-name">Berburu</div><div class="mode-desc">CD: ${s}s</div>`;
     };
     tick();
     huntAnimalCoolTimer = setInterval(tick, 1000);
@@ -923,7 +1097,13 @@ async function doHuntAnimal() {
     if (!currentUser) return;
     const btn = $('btnHuntAnimal');
     btn.disabled = true;
-    showLifeLog('🏹 Memasuki hutan berburu...');
+
+    const overlay = showActivityAnim({
+        icon: '🏹', title: 'Berburu Hewan',
+        color: '#b83232', color2: '#e04444', duration: 2.0,
+        steps: ['Masuk ke hutan...', 'Melacak target...', 'Membidik & menembak!']
+    });
+
     try {
         const res  = await fetch('/api/hunt-animal', {
             method: 'POST',
@@ -931,7 +1111,11 @@ async function doHuntAnimal() {
             body: JSON.stringify({ senderId: senderId() }),
         });
         const data = await res.json();
+
+        await new Promise(r => setTimeout(r, 2000));
+
         if (!data.ok) {
+            closeActivityAnim(overlay);
             showLifeLog(`❌ ${data.error}`);
             if (data.cooldownLeft) {
                 currentUser.lastHuntAnimal = Date.now() - (HUNT_ANIMAL_CD_MS - data.cooldownLeft * 1000);
@@ -943,6 +1127,18 @@ async function doHuntAnimal() {
         updateCharStats(currentUser);
         $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
 
+        const lvlUp = data.levelUpLog?.length ? `🎉 LEVEL UP! → Lv${currentUser.level}` : null;
+        showActivityResult(overlay, {
+            isRare: !!data.leather,
+            rows: [
+                { label: `🎯 ${data.animal || 'Hewan'}`, val: '' },
+                { label: '📦 Daging', val: `${data.qty}x ${data.meat?.replace(/_/g,' ')}`, float: '🥩' },
+                ...(data.leather ? [{ label: '🦴 Leather', val: '1x Leather', cls: 'purple', float: '⭐' }] : []),
+                { label: '✨ EXP',   val: `+${fmt(data.exp)}`, cls: 'green', float: '✨' },
+            ],
+            levelUp: lvlUp
+        });
+
         let log = `🎯 Target: <b>${data.animal}</b><br>📦 ${data.qty}x ${data.meat.replace(/_/g,' ')}`;
         if (data.leather) log += ` + 1x Leather ✨`;
         log += `<br>✨ +${fmt(data.exp)} EXP`;
@@ -952,6 +1148,7 @@ async function doHuntAnimal() {
 
         syncHuntAnimalCooldown(currentUser);
     } catch (e) {
+        closeActivityAnim(overlay);
         showLifeLog('❌ Koneksi gagal.');
         btn.disabled = false;
     }
