@@ -107,31 +107,6 @@
       <div class="section-title">✨ Skills Kamu</div>
       <div id="skillsList"></div>
     </div>
-    
-    <div class="dashboard-card">
-      <div class="card-header">🗺️ EXPLORATION</div>
-      <div class="card-body">
-        <div class="action-grid">
-          <button class="action-btn" id="btnHuntAnim" onclick="doExplore('huntanimal')">
-            <span class="action-icon">🏹</span>
-            <span>Berburu</span>
-            <span class="action-cd" id="cdHuntAnim">Siap</span>
-          </button>
-          <button class="action-btn" id="btnAdv" onclick="doExplore('adventure')">
-            <span class="action-icon">🏕️</span>
-            <span>Petualang</span>
-            <span class="action-cd" id="cdAdv">Siap</span>
-          </button>
-          <button class="action-btn" id="btnExp" onclick="doExplore('explore')">
-            <span class="action-icon">🌍</span>
-            <span>Jelajah</span>
-            <span class="action-cd" id="cdExp">Siap</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-
 
     <!-- Life Skills -->
     <div id="lifeSkillSection">
@@ -157,11 +132,30 @@
           <div class="mode-name">Farming</div>
           <div class="mode-desc">Tanam & Panen</div>
         </button>
+        <button class="mode-btn lifeskill-btn" id="btnExplore" onclick="doExplore()">
+          <div class="mode-icon">🌍</div>
+          <div class="mode-name">Explore</div>
+          <div class="mode-desc">CD: 2 menit</div>
+        </button>
+        <button class="mode-btn lifeskill-btn" id="btnAdv" onclick="doAdventure()">
+          <div class="mode-icon">🏞️</div>
+          <div class="mode-name">Adventure</div>
+          <div class="mode-desc">CD: 1 menit</div>
+        </button>
+        <button class="mode-btn lifeskill-btn" id="btnHuntAnimal" onclick="doHuntAnimal()">
+          <div class="mode-icon">🏹</div>
+          <div class="mode-name">Berburu</div>
+          <div class="mode-desc">CD: 30 detik</div>
+        </button>
       </div>
       <div class="glass-card" id="lifeLog" style="display:none"></div>
     </div>
-    
-    
+
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn-action" onclick="showStatsPage()">📊 Profil Lengkap</button>
+      <button class="btn-action" onclick="showSellPage()">💰 Jual Item</button>
+    </div>
 
     <!-- Farm Panel -->
     <div class="glass-card" id="farmPanel" style="display:none">
@@ -175,6 +169,28 @@
       <button class="btn-small btn-harvest-all" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
     </div>
 
+  </div>
+
+  <!-- ═══ STATS SECTION ═══ -->
+  <div id="statsSection" style="display:none" class="section-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideStatsPage()">← Kembali</button>
+      <div class="page-title">📊 Profil Lengkap</div>
+    </div>
+    <div id="statsContent" class="glass-card"></div>
+  </div>
+
+  <!-- ═══ SELL SECTION ═══ -->
+  <div id="sellSection" style="display:none" class="section-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideSellPage()">← Kembali</button>
+      <div class="page-title">💰 Jual Item</div>
+    </div>
+    <div class="glass-card" style="margin-bottom:8px">
+      <input id="sellSearch" type="text" placeholder="🔍 Cari item..." style="width:100%;box-sizing:border-box;padding:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:14px" oninput="renderSellList()">
+      <button class="btn-sell-all-big" onclick="doSellAll()" style="margin-top:8px;width:100%">💰 Jual SEMUA Item</button>
+    </div>
+    <div id="sellList" class="glass-card"></div>
   </div>
 
   <!-- Battle Section (hidden initially) -->
@@ -289,16 +305,6 @@
   </div>
 </div>
 
-    <div id="exploreOverlay" class="gather-overlay" style="display: none;">
-      <div class="gather-stage explore-stage">
-        <div id="exploreBg" class="gather-bg bg-explore"></div>
-        <div id="exploreIcon" class="gather-icon anim-explore">🧭</div>
-        <div id="exploreActionIcon" class="gather-action-icon anim-explore">🌍</div>
-        <div class="gather-caption" id="exploreCaption">Tiba di lokasi acak...</div>
-      </div>
-    </div>
-
-    
 <script src="app.js"></script>
 </body>
 </html>

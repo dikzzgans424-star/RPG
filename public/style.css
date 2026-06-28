@@ -1029,28 +1029,189 @@ body::after {
     font-family: 'Rajdhani', sans-serif;
 }
 
-    /* Exploration Overlay Styles */
-    .bg-explore.bg-huntanimal { background: radial-gradient(circle, rgba(139, 195, 74, 0.5) 0%, rgba(56, 142, 60, 0.6) 100%); }
-    .bg-explore.bg-adventure { background: radial-gradient(circle, rgba(255, 193, 7, 0.4) 0%, rgba(121, 85, 72, 0.5) 100%); }
-    .bg-explore.bg-explore { background: radial-gradient(circle, rgba(33, 150, 243, 0.4) 0%, rgba(25, 118, 210, 0.5) 100%); }
+/* ═══ QUICK ACTION BUTTONS ═══ */
+.btn-action {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 10px;
+    color: #f4d160;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: .5px;
+    transition: background .2s, transform .1s;
+}
+.btn-action:hover { background: rgba(255,255,255,.14); transform: translateY(-1px); }
+.btn-action:active { transform: scale(.97); }
 
-    .anim-explore.huntanimal-fire { animation: huntanimalFire 1.4s ease-out; }
-    .anim-explore.adventure-walk { animation: adventureWalk 1.4s linear infinite; }
-    .anim-explore.explore-spin { animation: exploreSpin 1.4s ease-in-out; }
+/* ═══ PAGE SECTIONS (Stats, Sell) ═══ */
+.section-page {
+    padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+}
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.page-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 16px;
+    color: #f4d160;
+    letter-spacing: 1px;
+}
+.btn-back-page {
+    padding: 7px 14px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 8px;
+    color: #e0c97f;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+}
+.btn-back-page:hover { background: rgba(255,255,255,.15); }
 
-    @keyframes huntanimalFire {
-      0% { transform: scale(1) translateY(0); }
-      30% { transform: scale(1.1) translateY(-10px); }
-      50% { transform: scale(1) translateY(5px); }
-      70% { transform: scale(1.05) translateY(-2px); }
-      100% { transform: scale(1) translateY(0); }
-    }
-    @keyframes adventureWalk {
-      0% { transform: translateX(-5px); }
-      50% { transform: translateX(5px); }
-      100% { transform: translateX(-5px); }
-    }
-    @keyframes exploreSpin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+/* ═══ STATS PAGE ═══ */
+.stat-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+.stat-role-badge {
+    font-size: 42px;
+    width: 60px;
+    text-align: center;
+}
+.stat-role-name {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 18px;
+    color: #f4d160;
+}
+.stat-rank {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: #aaa;
+    margin-top: 2px;
+}
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    color: #ccc;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.stat-row b { color: #f4f4f4; font-size: 15px; }
+.stat-expbar-wrap {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 4px 0 6px;
+}
+.stat-expbar {
+    height: 100%;
+    background: linear-gradient(90deg, #f4d160, #e07b39);
+    border-radius: 4px;
+    transition: width .5s ease;
+}
+.stat-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,.1);
+    margin: 14px 0 10px;
+}
+.stat-section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.stat-eq-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: #ccc;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.stat-eq-row b { color: #e0c97f; }
+.stat-passive {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: #ccc;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    line-height: 1.5;
+}
+
+/* ═══ SELL PAGE ═══ */
+.sell-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    gap: 8px;
+}
+.sell-info { flex: 1; }
+.sell-name {
+    display: block;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f4f4f4;
+}
+.sell-price {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: #aaa;
+}
+.sell-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-sell-one, .btn-sell-all {
+    padding: 5px 10px;
+    border-radius: 7px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+}
+.btn-sell-one {
+    background: rgba(255,255,255,.1);
+    color: #ddd;
+}
+.btn-sell-one:hover { background: rgba(255,255,255,.2); }
+.btn-sell-all {
+    background: linear-gradient(135deg, #c7a020, #e07b39);
+    color: #1a1208;
+}
+.btn-sell-all:hover { opacity: .85; }
+.btn-sell-all-big {
+    padding: 10px;
+    border-radius: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    background: linear-gradient(135deg, #c7a020, #e07b39);
+    color: #1a1208;
+    letter-spacing: .5px;
+}
+.btn-sell-all-big:hover { opacity: .85; }
