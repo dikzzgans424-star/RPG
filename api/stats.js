@@ -1,7 +1,7 @@
 // api/stats.js — GET /api/stats?id=...
 // Mengembalikan profil lengkap karakter (sama dengan bot: stats, equipment, rank)
 const { loadRpgDB, normalizeJid } = require('./_db');
-const { recalculateStats, roleData, getReqExp } = require('./_rpg');
+const { recalculateStats, roleData, getReqExp, getEquippedItem } = require('./_rpg');
 
 function getRank(level, role) {
     if (level >= 1000) return '👑 Mythical Legend';
@@ -66,7 +66,7 @@ module.exports = async (req, res) => {
             const itemKey = u.equipped?.[slot];
             const icon    = EQ_ICONS[slot] || '📦';
             if (!itemKey) return { slot, icon, name: null };
-            const itemData = (u.gearInventory || {})[itemKey] || {};
+            const itemData = getEquippedItem(u, slot) || {};
             return {
                 slot,
                 icon,

@@ -69,7 +69,19 @@ module.exports = async (req, res) => {
                     }
                 }
             });
-            if (rewards.length === 0) return res.status(200).json({ ok: true, empty: true, message: '😔 Batu yang kamu pukul tidak menghasilkan apapun. Coba lagi nanti!' });
+            if (rewards.length === 0) {
+                // Cooldown tetap harus jalan walau hasil kosong, supaya tombol
+                // di frontend tidak bisa langsung di-spam-klik ulang.
+                user[lastField] = now;
+                user[COUNT_FIELD[type]] = (user[COUNT_FIELD[type]] || 0) + 1;
+                await saveUserData(db, senderId, user);
+                return res.status(200).json({
+                    ok: true, empty: true,
+                    message: '😔 Batu yang kamu pukul tidak menghasilkan apapun. Coba lagi nanti!',
+                    cooldown: GATHER_COOLDOWN[type],
+                    user: { lastMining: user.lastMining || 0, lastWood: user.lastWood || 0, lastFish: user.lastFish || 0 },
+                });
+            }
         } else if (type === 'chop') {
             const bonus = Math.floor(Math.sqrt(toolPower));
             WOOD_TABLE.forEach(item => {
@@ -81,7 +93,17 @@ module.exports = async (req, res) => {
                     rewards.push({ name: item.name, key: item.key, amount });
                 }
             });
-            if (rewards.length === 0) return res.status(200).json({ ok: true, empty: true, message: '😔 Tidak ada yang bisa diambil.' });
+            if (rewards.length === 0) {
+                user[lastField] = now;
+                user[COUNT_FIELD[type]] = (user[COUNT_FIELD[type]] || 0) + 1;
+                await saveUserData(db, senderId, user);
+                return res.status(200).json({
+                    ok: true, empty: true,
+                    message: '😔 Tidak ada yang bisa diambil.',
+                    cooldown: GATHER_COOLDOWN[type],
+                    user: { lastMining: user.lastMining || 0, lastWood: user.lastWood || 0, lastFish: user.lastFish || 0 },
+                });
+            }
         } else if (type === 'fish') {
             const luckBonus = (toolPower / 25000) * 0.40;
             FISH_TABLE.forEach(fish => {

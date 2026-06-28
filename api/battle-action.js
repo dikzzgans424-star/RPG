@@ -290,6 +290,7 @@ module.exports = async (req, res) => {
         // ─── CHECK WIN/LOSE ───
         if (turnResult !== 'flee') {
             if (b.monsterHp <= 0) {
+                b.monsterHp = 0; // jangan biarkan negatif "nyangkut" di response/log
                 turnResult = 'win';
                 // Horde: next wave
                 if (mode === 'horde') {
@@ -402,6 +403,11 @@ module.exports = async (req, res) => {
             log: logLines,
             reward,
             battle: (turnResult === 'ongoing' || turnResult === 'next_wave' || turnResult === 'next_phase') ? b : null,
+            // Dikirim terpisah dari `battle` supaya frontend selalu bisa render HP bar
+            // musuh ke kondisi akhir yang benar (misal 0 saat menang), walau battle
+            // sudah dihapus dari DB dan field `battle` di atas jadi null.
+            finalMonsterHp: b.monsterHp,
+            finalMonsterMaxHp: b.monsterMaxHp,
             user: {
                 hp: user.hp, maxHp: user.maxHp,
                 mana: user.mana, maxMana: user.maxMana,
