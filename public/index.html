@@ -102,12 +102,6 @@
       </div>
     </div>
 
-    <!-- Skills Preview -->
-    <div class="glass-card" id="skillsCard" style="display:none">
-      <div class="section-title">✨ Skills Kamu</div>
-      <div id="skillsList"></div>
-    </div>
-
     <!-- Life Skills -->
     <div id="lifeSkillSection">
       <div class="section-title">🌿 Life Skills</div>
@@ -132,20 +126,20 @@
           <div class="mode-name">Farming</div>
           <div class="mode-desc">Tanam & Panen</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnExplore" onclick="doExplore()">
+        <button class="mode-btn lifeskill-btn" id="btnExplore" onclick="doExplore()" disabled>
           <div class="mode-icon">🌍</div>
           <div class="mode-name">Explore</div>
-          <div class="mode-desc">CD: 2 menit</div>
+          <div class="mode-desc" id="cdExplore">Memuat...</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnAdv" onclick="doAdventure()">
+        <button class="mode-btn lifeskill-btn" id="btnAdv" onclick="doAdventure()" disabled>
           <div class="mode-icon">🏞️</div>
           <div class="mode-name">Adventure</div>
-          <div class="mode-desc">CD: 1 menit</div>
+          <div class="mode-desc" id="cdAdv">Memuat...</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnHuntAnimal" onclick="doHuntAnimal()">
+        <button class="mode-btn lifeskill-btn" id="btnHuntAnimal" onclick="doHuntAnimal()" disabled>
           <div class="mode-icon">🏹</div>
           <div class="mode-name">Berburu</div>
-          <div class="mode-desc">CD: 30 detik</div>
+          <div class="mode-desc" id="cdHuntAnimal">Memuat...</div>
         </button>
       </div>
       <div class="glass-card" id="lifeLog" style="display:none"></div>
@@ -154,6 +148,7 @@
     <!-- Quick Actions -->
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn-action" onclick="showStatsPage()">📊 Profil Lengkap</button>
+      <button class="btn-action" onclick="showShopPage()">🛒 Shop</button>
       <button class="btn-action" onclick="showSellPage()">💰 Jual Item</button>
     </div>
 
@@ -186,11 +181,82 @@
       <button class="btn-back-page" onclick="hideSellPage()">← Kembali</button>
       <div class="page-title">💰 Jual Item</div>
     </div>
-    <div class="glass-card" style="margin-bottom:8px">
-      <input id="sellSearch" type="text" placeholder="🔍 Cari item..." style="width:100%;box-sizing:border-box;padding:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:14px" oninput="renderSellList()">
-      <button class="btn-sell-all-big" onclick="doSellAll()" style="margin-top:8px;width:100%">💰 Jual SEMUA Item</button>
+
+    <div class="sell-summary-card glass-card">
+      <div class="sell-summary-item">
+        <span class="sell-summary-label">🪙 Gold Kamu</span>
+        <span class="sell-summary-val" id="sellGoldVal">-</span>
+      </div>
+      <div class="sell-summary-divider"></div>
+      <div class="sell-summary-item">
+        <span class="sell-summary-label">📦 Total Item Sellable</span>
+        <span class="sell-summary-val" id="sellTotalItems">-</span>
+      </div>
     </div>
+
+    <div class="glass-card sell-toolbar">
+      <input id="sellSearch" type="text" placeholder="🔍 Cari item..." oninput="renderSellList()">
+      <select id="sellSort" onchange="renderSellList()">
+        <option value="value_desc">Nilai Total ↓</option>
+        <option value="value_asc">Nilai Total ↑</option>
+        <option value="qty_desc">Stok ↓</option>
+        <option value="name_asc">Nama A-Z</option>
+      </select>
+    </div>
+
+    <div class="sell-select-toolbar">
+      <label class="sell-checkbox-label">
+        <input type="checkbox" id="sellSelectAll" onchange="toggleSelectAllSell(this.checked)">
+        <span>Pilih Semua</span>
+      </label>
+      <span id="sellSelectedCount" class="sell-selected-count"></span>
+    </div>
+
     <div id="sellList" class="glass-card"></div>
+  </div>
+
+  <!-- Sticky bottom action bar (muncul saat ada item dicentang) -->
+  <div id="sellActionBar" class="sell-action-bar" style="display:none">
+    <div class="sell-action-info">
+      <span class="sell-action-count" id="sellActionCount">0 item</span>
+      <span class="sell-action-total" id="sellActionTotal">+0 🪙</span>
+    </div>
+    <button class="btn-sell-confirm" onclick="doSellSelected()">💰 Jual Pilihan</button>
+  </div>
+
+  <!-- ═══ SHOP SECTION ═══ -->
+  <div id="shopSection" style="display:none" class="section-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideShopPage()">← Kembali</button>
+      <div class="page-title">🛒 Shop</div>
+    </div>
+    <div class="glass-card" id="shopGoldBar" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <span>🪙 Gold kamu</span>
+      <b id="shopGoldVal">-</b>
+    </div>
+    <div class="glass-card" style="margin-bottom:8px">
+      <input id="shopSearch" type="text" placeholder="🔍 Cari item..." style="width:100%;box-sizing:border-box;padding:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:14px" oninput="renderShopList()">
+    </div>
+    <div id="shopCategoryTabs" class="shop-cat-tabs"></div>
+    <div id="shopList" class="glass-card"></div>
+  </div>
+
+  <!-- Buy quantity modal -->
+  <div id="shopBuyModal" class="shop-buy-modal" style="display:none">
+    <div class="shop-buy-card glass-card">
+      <div class="shop-buy-title" id="shopBuyTitle">-</div>
+      <div class="shop-buy-price" id="shopBuyPrice">-</div>
+      <div class="shop-buy-qty-row">
+        <button onclick="adjustBuyQty(-1)">−</button>
+        <input id="shopBuyQty" type="number" min="1" value="1" oninput="updateBuyTotal()">
+        <button onclick="adjustBuyQty(1)">+</button>
+      </div>
+      <div class="shop-buy-total" id="shopBuyTotal">Total: -</div>
+      <div class="shop-buy-actions">
+        <button class="btn-small" onclick="closeBuyModal()">Batal</button>
+        <button class="btn-small btn-confirm-buy" onclick="confirmBuy()">✅ Beli</button>
+      </div>
+    </div>
   </div>
 
   <!-- Battle Section (hidden initially) -->

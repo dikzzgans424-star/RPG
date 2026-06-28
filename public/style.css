@@ -358,31 +358,6 @@ body::after {
 .mode-name { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 4px; letter-spacing: 0.5px; }
 .mode-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
 
-/* ── SKILLS PREVIEW ── */
-#skillsList { display: flex; flex-direction: column; gap: 8px; }
-
-.skill-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg-raised);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-soft);
-}
-
-.skill-name {
-  font-weight: 700;
-  font-size: 14px;
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.skill-mana { font-size: 12px; color: #5588cc; }
-.skill-cd   { font-size: 11px; color: var(--text-muted); }
-.skill-ready { color: #38a870 !important; }
-.skill-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-
 /* ── BATTLE SECTION ── */
 .battle-header {
   display: flex;
@@ -1054,6 +1029,7 @@ body::after {
     max-width: 480px;
     margin: 0 auto;
 }
+#sellSection { padding-bottom: 90px; }
 .page-header {
     display: flex;
     align-items: center;
@@ -1161,15 +1137,110 @@ body::after {
 }
 
 /* ═══ SELL PAGE ═══ */
-.sell-row {
+.sell-summary-card {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 14px 16px;
+}
+.sell-summary-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.sell-summary-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+.sell-summary-val {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #d9b35c;
+}
+.sell-summary-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255,255,255,.12);
+    margin: 0 14px;
+}
+
+.sell-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 10px;
+}
+.sell-toolbar input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 9px 10px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: 'Rajdhani', sans-serif;
+}
+.sell-toolbar select {
+    flex-shrink: 0;
+    padding: 9px 8px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 8px;
+    color: #ddd;
+    font-size: 13px;
+    font-family: 'Rajdhani', sans-serif;
+}
+
+.sell-select-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,.07);
-    gap: 8px;
+    padding: 4px 6px 8px;
 }
-.sell-info { flex: 1; }
+.sell-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ccc;
+    cursor: pointer;
+}
+.sell-checkbox-label input[type="checkbox"] {
+    width: 17px; height: 17px;
+    accent-color: #c7a020;
+    cursor: pointer;
+}
+.sell-selected-count {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: #888;
+}
+
+.sell-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    gap: 10px;
+}
+.sell-row:last-child { border-bottom: none; }
+.sell-row.is-selected { background: rgba(199,160,32,.06); margin: 0 -14px; padding: 12px 14px; border-radius: 8px; }
+.sell-row-check {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    accent-color: #c7a020;
+    cursor: pointer;
+}
+.sell-info { flex: 1; min-width: 0; }
 .sell-name {
     display: block;
     font-family: 'Rajdhani', sans-serif;
@@ -1182,39 +1253,261 @@ body::after {
     font-size: 12px;
     color: #aaa;
 }
-.sell-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.btn-sell-one, .btn-sell-all {
-    padding: 5px 10px;
-    border-radius: 7px;
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 12px;
+.sell-price .sell-row-value { color: #7fc384; font-weight: 700; }
+
+.sell-qty-control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.sell-qty-control button {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+}
+.sell-qty-control button:hover { background: rgba(255,255,255,.2); }
+.sell-qty-control input {
+    width: 50px;
+    text-align: center;
+    padding: 5px 2px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    font-size: 13px;
     font-weight: 700;
+    font-family: 'Rajdhani', sans-serif;
+}
+.sell-qty-chips {
+    display: flex;
+    gap: 4px;
+    margin-left: 4px;
+}
+.sell-qty-chip {
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: rgba(255,255,255,.08);
+    color: #aaa;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Rajdhani', sans-serif;
     cursor: pointer;
     border: none;
 }
-.btn-sell-one {
+.sell-qty-chip:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+/* Sticky bottom action bar */
+.sell-action-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    background: rgba(18,14,10,.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(199,160,32,.3);
+    box-shadow: 0 -6px 20px rgba(0,0,0,.4);
+}
+.sell-action-info { display: flex; flex-direction: column; gap: 1px; }
+.sell-action-count {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    color: #999;
+}
+.sell-action-total {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #d9b35c;
+}
+.btn-sell-confirm {
+    padding: 11px 22px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #c7a020, #e07b39);
+    color: #1a1208;
+    flex-shrink: 0;
+}
+.btn-sell-confirm:hover { opacity: .88; }
+.btn-sell-confirm:active { transform: scale(.97); }
+
+/* ═══ SHOP PAGE ═══ */
+.shop-cat-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    scrollbar-width: none;
+}
+.shop-cat-tabs::-webkit-scrollbar { display: none; }
+.shop-cat-tab {
+    flex-shrink: 0;
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.06);
+    color: #ccc;
+}
+.shop-cat-tab.active {
+    background: linear-gradient(135deg, #c7a020, #e07b39);
+    color: #1a1208;
+    border-color: transparent;
+}
+.shop-cat-heading {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #d9b35c;
+    margin: 14px 0 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.shop-cat-heading .limit-tag {
+    font-size: 11px;
+    color: #888;
+    font-weight: 500;
+}
+.shop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    gap: 8px;
+}
+.shop-row:last-child { border-bottom: none; }
+.shop-row-info { flex: 1; min-width: 0; }
+.shop-row-name {
+    display: block;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f4f4f4;
+}
+.shop-row-meta {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: #aaa;
+}
+.shop-row-meta .owned-tag { color: #7fc384; margin-left: 6px; }
+.btn-shop-buy {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    background: linear-gradient(135deg, #2f8fc2, #6fc3ef);
+    color: #0a1a22;
+}
+.btn-shop-buy:hover { opacity: .85; }
+.btn-shop-buy:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Buy quantity modal */
+.shop-buy-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+}
+.shop-buy-card {
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+}
+.shop-buy-title {
+    font-family: 'Cinzel', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #f4f4f4;
+    margin-bottom: 4px;
+}
+.shop-buy-price {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 14px;
+}
+.shop-buy-qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.shop-buy-qty-row button {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+}
+.shop-buy-qty-row button:hover { background: rgba(255,255,255,.2); }
+.shop-buy-qty-row input {
+    width: 70px;
+    text-align: center;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+}
+.shop-buy-total {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #d9b35c;
+    margin-bottom: 14px;
+}
+.shop-buy-actions { display: flex; gap: 8px; }
+.shop-buy-actions .btn-small {
+    flex: 1;
+    padding: 9px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
     background: rgba(255,255,255,.1);
     color: #ddd;
 }
-.btn-sell-one:hover { background: rgba(255,255,255,.2); }
-.btn-sell-all {
-    background: linear-gradient(135deg, #c7a020, #e07b39);
-    color: #1a1208;
+.btn-confirm-buy {
+    background: linear-gradient(135deg, #c7a020, #e07b39) !important;
+    color: #1a1208 !important;
 }
-.btn-sell-all:hover { opacity: .85; }
-.btn-sell-all-big {
-    padding: 10px;
-    border-radius: 10px;
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    border: none;
-    background: linear-gradient(135deg, #c7a020, #e07b39);
-    color: #1a1208;
-    letter-spacing: .5px;
-}
-.btn-sell-all-big:hover { opacity: .85; }
 
 /* ══════════════════════════════════════
    ACTIVITY ANIMATION OVERLAY

@@ -84,12 +84,6 @@ function showDashboard(data) {
 
     updateCharStats(u);
 
-    // Skills card
-    if (unlockedSkills.length > 0) {
-        $('skillsCard').style.display = '';
-        renderSkillsList(unlockedSkills, u);
-    }
-
     // Check existing battles
     const battles = data.battles;
     let hasActive = false;
@@ -126,23 +120,6 @@ function updateCharStats(u) {
     $('statExp').textContent  = fmt(u.exp);
 }
 
-function renderSkillsList(skills, u) {
-    const now = Date.now();
-    $('skillsList').innerHTML = skills.map(s => {
-        const cdEnd = (u.cooldowns?.[s.name] || 0);
-        const onCd  = now < cdEnd;
-        const cdSec = onCd ? Math.ceil((cdEnd - now) / 1000) : 0;
-        return `
-        <div class="skill-row">
-          <div style="flex:1">
-            <div class="skill-name">✨ ${s.name}</div>
-            <div class="skill-desc">${s.description || ''}</div>
-          </div>
-          <div class="skill-mana">💧${s.mana}MP</div>
-          ${onCd ? `<div class="skill-cd">⏳${cdSec}s</div>` : `<div class="skill-cd skill-ready">✅</div>`}
-        </div>`;
-    }).join('');
-}
 
 // ─── START BATTLE ───
 async function startBattle(mode) {
@@ -1224,12 +1201,18 @@ function hideStatsPage() {
 //  SELL
 // ════════════════════════════════════════
 let sellItems = [];
+let sellQtyState = {};    // { [key]: qty }
+let sellSelected = new Set();
+let shopCategories = [];
+let shopActiveCat = 'all';
+let shopBuyTarget = null; // { key, name, price }
 
 async function showSellPage() {
     if (!currentUser) return;
     $('sellSection').style.display = '';
     $('dashboardSection').style.display = 'none';
     $('sellList').innerHTML = '<p style="text-align:center;opacity:.5">Memuat item...</p>';
+    sellSelected.clear();
     await loadSellItems();
 }
 
@@ -1244,29 +1227,122 @@ async function loadSellItems() {
         const data = await res.json();
         if (!data.ok) { $('sellList').innerHTML = `<p>❌ ${data.error}</p>`; return; }
         sellItems = data.items;
+        // Default qty tiap item = stok penuh (gampang buat user yang mau jual semua dari satu item)
+        sellItems.forEach(i => { if (sellQtyState[i.key] === undefined) sellQtyState[i.key] = i.qty; });
+        $('sellGoldVal').textContent = `${fmt(currentUser?.gold || 0)} 🪙`;
+        $('sellTotalItems').textContent = `${fmt(sellItems.length)} jenis`;
         renderSellList();
+        updateSellActionBar();
     } catch { $('sellList').innerHTML = '<p>❌ Gagal memuat.</p>'; }
+}
+
+function sortSellItems(items, mode) {
+    const arr = [...items];
+    switch (mode) {
+        case 'value_asc':  return arr.sort((a, b) => (a.price * a.qty) - (b.price * b.qty));
+        case 'qty_desc':   return arr.sort((a, b) => b.qty - a.qty);
+        case 'name_asc':   return arr.sort((a, b) => a.name.localeCompare(b.name));
+        case 'value_desc':
+        default:           return arr.sort((a, b) => (b.price * b.qty) - (a.price * a.qty));
+    }
 }
 
 function renderSellList() {
     const query = ($('sellSearch')?.value || '').toLowerCase();
-    const filtered = sellItems.filter(i => i.qty > 0 && i.name.toLowerCase().includes(query));
+    const sortMode = $('sellSort')?.value || 'value_desc';
+    const filtered = sortSellItems(
+        sellItems.filter(i => i.qty > 0 && i.name.toLowerCase().includes(query)),
+        sortMode
+    );
+
     if (filtered.length === 0) {
         $('sellList').innerHTML = '<p style="opacity:.5;text-align:center">Tidak ada item yang bisa dijual.</p>';
         return;
     }
-    $('sellList').innerHTML = filtered.map(i => `
-        <div class="sell-row">
+
+    $('sellList').innerHTML = filtered.map(i => {
+        const qty = Math.min(sellQtyState[i.key] ?? i.qty, i.qty);
+        const checked = sellSelected.has(i.key);
+        return `
+        <div class="sell-row${checked ? ' is-selected' : ''}">
+            <input type="checkbox" class="sell-row-check" ${checked ? 'checked' : ''} onchange="toggleSellSelect('${i.key}', this.checked)">
             <div class="sell-info">
                 <span class="sell-name">${i.name}</span>
-                <span class="sell-price">💰 ${fmt(i.price)}/item | 📦 ${fmt(i.qty)}x</span>
+                <span class="sell-price">💰 ${fmt(i.price)}/item · 📦 ${fmt(i.qty)}x dimiliki · <span class="sell-row-value">${fmt(i.price * qty)} 🪙</span></span>
             </div>
-            <div class="sell-actions">
-                <button class="btn-sell-one" onclick="doSell('${i.key}',1)">Jual 1</button>
-                <button class="btn-sell-all" onclick="doSell('${i.key}','all')">Jual Semua</button>
+            <div class="sell-qty-control">
+                <button onclick="adjustSellQty('${i.key}', -1)">−</button>
+                <input type="number" min="1" max="${i.qty}" value="${qty}" onchange="setSellQty('${i.key}', this.value)">
+                <button onclick="adjustSellQty('${i.key}', 1)">+</button>
+                <div class="sell-qty-chips">
+                    <button class="sell-qty-chip" onclick="setSellQtyPct('${i.key}', 0.5)">50%</button>
+                    <button class="sell-qty-chip" onclick="setSellQtyPct('${i.key}', 1)">Max</button>
+                </div>
             </div>
-        </div>`
-    ).join('');
+        </div>`;
+    }).join('');
+}
+
+function clampQty(key, val) {
+    const item = sellItems.find(i => i.key === key);
+    if (!item) return 1;
+    return Math.max(1, Math.min(item.qty, val));
+}
+
+function setSellQty(key, val) {
+    sellQtyState[key] = clampQty(key, parseInt(val) || 1);
+    renderSellList();
+    updateSellActionBar();
+}
+
+function adjustSellQty(key, delta) {
+    const current = sellQtyState[key] ?? 1;
+    sellQtyState[key] = clampQty(key, current + delta);
+    renderSellList();
+    updateSellActionBar();
+}
+
+function setSellQtyPct(key, pct) {
+    const item = sellItems.find(i => i.key === key);
+    if (!item) return;
+    sellQtyState[key] = clampQty(key, Math.max(1, Math.round(item.qty * pct)));
+    renderSellList();
+    updateSellActionBar();
+}
+
+function toggleSellSelect(key, checked) {
+    if (checked) sellSelected.add(key); else sellSelected.delete(key);
+    renderSellList();
+    updateSellActionBar();
+}
+
+function toggleSelectAllSell(checked) {
+    const visibleKeys = sellItems.filter(i => i.qty > 0).map(i => i.key);
+    if (checked) visibleKeys.forEach(k => sellSelected.add(k));
+    else sellSelected.clear();
+    renderSellList();
+    updateSellActionBar();
+}
+
+function updateSellActionBar() {
+    const bar = $('sellActionBar');
+    if (sellSelected.size === 0) {
+        bar.style.display = 'none';
+        $('sellSelectedCount').textContent = '';
+        $('sellSelectAll').checked = false;
+        return;
+    }
+    let total = 0;
+    sellSelected.forEach(key => {
+        const item = sellItems.find(i => i.key === key);
+        if (!item) return;
+        const qty = Math.min(sellQtyState[key] ?? item.qty, item.qty);
+        total += item.price * qty;
+    });
+    bar.style.display = 'flex';
+    $('sellActionCount').textContent = `${sellSelected.size} item dipilih`;
+    $('sellActionTotal').textContent = `+${fmt(total)} 🪙`;
+    $('sellSelectedCount').textContent = `${sellSelected.size} dipilih`;
 }
 
 async function doSell(item, qty) {
@@ -1286,22 +1362,40 @@ async function doSell(item, qty) {
     } catch { showLifeLog('❌ Gagal menjual.'); }
 }
 
-async function doSellAll() {
-    try {
-        const res  = await fetch('/api/sell', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderId: senderId(), item: 'all', qty: 'all' }),
-        });
-        const data = await res.json();
-        if (!data.ok) { showLifeLog(`❌ ${data.error}`); return; }
-        currentUser.gold = data.user.gold;
-        currentUser.inventory = data.user.inventory;
-        updateCharStats(currentUser);
-        const lines = Object.entries(data.soldItems).map(([k,v]) => `${v}x ${k}`).join(', ');
-        showLifeLog(`💰 Jual Semua! <b>${data.totalGoldText}</b><br><small>${lines}</small>`);
-        await loadSellItems();
-    } catch { showLifeLog('❌ Gagal menjual.'); }
+// Jual semua item yang dicentang, masing-masing dengan qty yang sudah diset user.
+// Dikirim sequential (bukan paralel) supaya update gold tiap step konsisten dan
+// tidak ada race condition di server kalau dua request sell jalan bersamaan.
+async function doSellSelected() {
+    if (sellSelected.size === 0) return;
+    const keys = Array.from(sellSelected);
+    let totalGold = 0;
+    const soldLines = [];
+
+    for (const key of keys) {
+        const item = sellItems.find(i => i.key === key);
+        if (!item) continue;
+        const qty = Math.min(sellQtyState[key] ?? item.qty, item.qty);
+        if (qty <= 0) continue;
+        try {
+            const res  = await fetch('/api/sell', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senderId: senderId(), item: key, qty }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+                currentUser.gold = data.user.gold;
+                currentUser.inventory = data.user.inventory;
+                totalGold += data.totalGold;
+                soldLines.push(`${qty}x ${item.name}`);
+            }
+        } catch { /* lanjut ke item berikutnya walau satu gagal */ }
+    }
+
+    updateCharStats(currentUser);
+    sellSelected.clear();
+    showLifeLog(`💰 Jual Pilihan! <b>+${fmt(totalGold)} Gold</b><br><small>${soldLines.join(', ')}</small>`);
+    await loadSellItems();
 }
 
 // ─── Sync semua cooldown baru saat load dashboard ───
@@ -1310,6 +1404,123 @@ function syncAllCooldowns(user) {
     syncExploreCooldown(user);
     syncAdvCooldown(user);
     syncHuntAnimalCooldown(user);
+}
+
+// ════════════════════════════════════════
+//  SHOP
+// ════════════════════════════════════════
+async function showShopPage() {
+    if (!currentUser) return;
+    $('shopSection').style.display = '';
+    $('dashboardSection').style.display = 'none';
+    $('shopList').innerHTML = '<p style="text-align:center;opacity:.5">Memuat shop...</p>';
+    shopActiveCat = 'all';
+    await loadShopItems();
+}
+
+function hideShopPage() {
+    $('shopSection').style.display = 'none';
+    $('dashboardSection').style.display = '';
+}
+
+async function loadShopItems() {
+    try {
+        const res  = await fetch(`/api/shop?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (!data.ok) { $('shopList').innerHTML = `<p>❌ ${data.error}</p>`; return; }
+        shopCategories = data.categories;
+        $('shopGoldVal').textContent = `${fmt(data.gold)} 🪙`;
+        renderShopCategoryTabs();
+        renderShopList();
+    } catch { $('shopList').innerHTML = '<p>❌ Gagal memuat shop.</p>'; }
+}
+
+function renderShopCategoryTabs() {
+    const tabs = [{ key: 'all', icon: '🗂️', label: 'Semua' }, ...shopCategories];
+    $('shopCategoryTabs').innerHTML = tabs.map(c => `
+        <div class="shop-cat-tab${shopActiveCat === c.key ? ' active' : ''}" onclick="setShopCat('${c.key}')">
+            ${c.icon} ${c.label}
+        </div>`
+    ).join('');
+}
+
+function setShopCat(key) {
+    shopActiveCat = key;
+    renderShopCategoryTabs();
+    renderShopList();
+}
+
+function renderShopList() {
+    const query = ($('shopSearch')?.value || '').toLowerCase();
+    const cats = shopActiveCat === 'all'
+        ? shopCategories
+        : shopCategories.filter(c => c.key === shopActiveCat);
+
+    let html = '';
+    cats.forEach(cat => {
+        const items = cat.items.filter(i => i.name.toLowerCase().includes(query));
+        if (items.length === 0) return;
+        html += `<div class="shop-cat-heading"><span>${cat.icon} ${cat.label}</span>${cat.limitText ? `<span class="limit-tag">${cat.limitText}</span>` : ''}</div>`;
+        html += items.map(i => `
+            <div class="shop-row">
+                <div class="shop-row-info">
+                    <span class="shop-row-name">${i.name}</span>
+                    <span class="shop-row-meta">💰 ${fmt(i.price)}/item${i.showValue ? ` · +${fmt(i.value)} ${i.valueLabel}` : ''}${i.owned > 0 ? `<span class="owned-tag">📦 ${fmt(i.owned)}x</span>` : ''}</span>
+                </div>
+                <button class="btn-shop-buy" onclick='openBuyModal(${JSON.stringify({ key: i.key, name: i.name, price: i.price })})'>Beli</button>
+            </div>`
+        ).join('');
+    });
+
+    $('shopList').innerHTML = html || '<p style="opacity:.5;text-align:center">Item tidak ditemukan.</p>';
+}
+
+function openBuyModal(target) {
+    shopBuyTarget = target;
+    $('shopBuyTitle').textContent = target.name;
+    $('shopBuyPrice').textContent = `💰 ${fmt(target.price)} Gold/item`;
+    $('shopBuyQty').value = 1;
+    updateBuyTotal();
+    $('shopBuyModal').style.display = 'flex';
+}
+
+function closeBuyModal() {
+    $('shopBuyModal').style.display = 'none';
+    shopBuyTarget = null;
+}
+
+function adjustBuyQty(delta) {
+    const input = $('shopBuyQty');
+    const val = Math.max(1, (parseInt(input.value) || 1) + delta);
+    input.value = val;
+    updateBuyTotal();
+}
+
+function updateBuyTotal() {
+    if (!shopBuyTarget) return;
+    const qty = Math.max(1, parseInt($('shopBuyQty').value) || 1);
+    $('shopBuyTotal').textContent = `Total: ${fmt(shopBuyTarget.price * qty)} 🪙`;
+}
+
+async function confirmBuy() {
+    if (!shopBuyTarget) return;
+    const qty = Math.max(1, parseInt($('shopBuyQty').value) || 1);
+    try {
+        const res  = await fetch('/api/shop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), itemKey: shopBuyTarget.key, qty }),
+        });
+        const data = await res.json();
+        if (!data.ok) { alert(`❌ ${data.error}`); return; }
+
+        currentUser = { ...currentUser, ...data.user };
+        updateCharStats(currentUser);
+        $('shopGoldVal').textContent = `${fmt(currentUser.gold)} 🪙`;
+        closeBuyModal();
+        await loadShopItems(); // refresh limit harian & owned count
+        showLifeLog(`🛒 Berhasil beli <b>${qty}x ${data.bought.name}</b> — -${fmt(data.totalGold)} 🪙`);
+    } catch { alert('❌ Gagal terhubung ke server.'); }
 }
 
 // ─── AUTO-LOGIN (from localStorage) ───
