@@ -1314,8 +1314,48 @@ body::after {
 .act-icon {
   font-size:56px;
   display:inline-block;
-  animation:actIconBounce .55s cubic-bezier(.34,1.56,.64,1);
+  animation:actIconBounce .55s cubic-bezier(.34,1.56,.64,1),
+            actIconLoop 1.6s ease-in-out .55s infinite;
   filter:drop-shadow(0 0 14px var(--act-color, #c9963c));
+  transform-origin: 60% 85%;
+}
+@keyframes actIconLoop {
+  0%, 100% { transform: scale(1) rotate(-6deg); }
+  50%      { transform: scale(1.08) rotate(6deg); }
+}
+/* Variasi gerakan khas tiap life-skill, dipasang via class tambahan saat overlay dibuka */
+.act-icon.act-mine {
+  animation: actIconBounce .55s cubic-bezier(.34,1.56,.64,1),
+             actPickaxeSwing .55s ease-in-out .55s infinite;
+}
+@keyframes actPickaxeSwing {
+  0%   { transform: rotate(-35deg); }
+  50%  { transform: rotate(20deg); }
+  100% { transform: rotate(-35deg); }
+}
+.act-icon.act-chop {
+  animation: actIconBounce .55s cubic-bezier(.34,1.56,.64,1),
+             actAxeChop .6s ease-in-out .55s infinite;
+}
+@keyframes actAxeChop {
+  0%   { transform: rotate(-45deg) translate(0,0); }
+  45%  { transform: rotate(25deg) translate(4px,4px); }
+  100% { transform: rotate(-45deg) translate(0,0); }
+}
+.act-icon.act-fish {
+  animation: actIconBounce .55s cubic-bezier(.34,1.56,.64,1),
+             actRodBob 1.1s ease-in-out .55s infinite;
+}
+@keyframes actRodBob {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(4deg); }
+}
+.act-icon.fish-bite {
+  animation: actBiteYank .35s ease-in-out 2 !important;
+}
+@keyframes actBiteYank {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(10px) scale(1.15); }
 }
 
 /* Title */

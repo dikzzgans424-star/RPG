@@ -112,20 +112,20 @@
     <div id="lifeSkillSection">
       <div class="section-title">🌿 Life Skills</div>
       <div class="mode-grid">
-        <button class="mode-btn lifeskill-btn" id="btnMine" onclick="doGather('mine')">
+        <button class="mode-btn lifeskill-btn" id="btnMine" onclick="doGather('mine')" disabled>
           <div class="mode-icon">⛏️</div>
           <div class="mode-name">Mining</div>
-          <div class="mode-desc" id="cdMine">Butuh Pickaxe</div>
+          <div class="mode-desc" id="cdMine">Memuat...</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnChop" onclick="doGather('chop')">
+        <button class="mode-btn lifeskill-btn" id="btnChop" onclick="doGather('chop')" disabled>
           <div class="mode-icon">🪓</div>
           <div class="mode-name">Woodcut</div>
-          <div class="mode-desc" id="cdChop">Butuh Axe</div>
+          <div class="mode-desc" id="cdChop">Memuat...</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnFish" onclick="doGather('fish')">
+        <button class="mode-btn lifeskill-btn" id="btnFish" onclick="doGather('fish')" disabled>
           <div class="mode-icon">🎣</div>
           <div class="mode-name">Fishing</div>
-          <div class="mode-desc" id="cdFish">Butuh Fishing Rod</div>
+          <div class="mode-desc" id="cdFish">Memuat...</div>
         </button>
         <button class="mode-btn lifeskill-btn" id="btnFarm" onclick="toggleFarmPanel()">
           <div class="mode-icon">🌾</div>
@@ -293,16 +293,6 @@
   </div>
 
   <div class="footer">Miwa — Premium RPG Engine</div>
-</div>
-
-<!-- Gather Animation Overlay -->
-<div id="gatherOverlay" class="gather-overlay" style="display:none">
-  <div class="gather-stage">
-    <div class="gather-bg" id="gatherBg"></div>
-    <div class="gather-icon" id="gatherIcon">🎣</div>
-    <div class="gather-action-icon" id="gatherActionIcon">🐟</div>
-    <div class="gather-caption" id="gatherCaption">Melempar kail...</div>
-  </div>
 </div>
 
 <script src="app.js"></script>

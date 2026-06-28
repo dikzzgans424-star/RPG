@@ -71,6 +71,10 @@ function showDashboard(data) {
     $('dashboardSection').style.display = '';
     $('battleSection').style.display   = 'none';
 
+    // Safety net: tombol mode battle harus selalu enabled saat di lobby,
+    // kalau tidak ada battle aktif lain yang sedang di-resume.
+    document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+
     const u = data.user;
     const ri = data.roleInfo || {};
 
@@ -167,6 +171,7 @@ async function startBattle(mode) {
         currentBattle = data.battle;
         currentMode   = mode;
         showBattle();
+        document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
         isProcessing = false;
     } catch (e) {
         setStatus('Gagal memulai battle', 'error');
@@ -382,6 +387,11 @@ async function doAction(action, skillName = null) {
                 $('monsterName').textContent  = data.battle.monster?.name  || '???';
                 $('monsterStatus').textContent = data.battle.isBossWave ? '⚠️ BOSS WAVE' : '';
             }
+        } else if (data.finalMonsterHp !== undefined && data.finalMonsterMaxHp) {
+            // Battle sudah selesai (win/lose/flee/horde_complete) — backend tidak
+            // mengirim battle state lagi, tapi server tetap kirim HP final yang
+            // benar (0 saat menang) supaya bar tidak nyangkut di angka sebelumnya.
+            updateMonsterHp(data.finalMonsterHp, data.finalMonsterMaxHp);
         }
 
         // Handle result
@@ -532,19 +542,30 @@ function fmt(n) {
 //  LIFE SKILLS — Mining / Woodcut / Fishing
 // ════════════════════════════════════════
 const GATHER_LABEL = {
-    mine: { icon: '⛏️', actionIcon: '🪨', title: 'Mining', cd: 60, caption: 'Menambang batu...' },
-    chop: { icon: '🪓', actionIcon: '🌳', title: 'Woodcut', cd: 45, caption: 'Menebang kayu...' },
-    fish: { icon: '🎣', actionIcon: '🐟', title: 'Fishing', cd: 30, caption: 'Menunggu kail disambar...' },
+    mine: { icon: '⛏️', iconClass: 'act-mine', actionEmoji: '🪨', title: 'Mining', color: '#8d6e63', color2: '#bca08f', cd: 60,
+        steps: ['Mencari urat batu...', 'Menambang dengan pickaxe...', 'Mengumpulkan hasil...'] },
+    chop: { icon: '🪓', iconClass: 'act-chop', actionEmoji: '🌳', title: 'Woodcut', color: '#4a8f4f', color2: '#7fc384', cd: 45,
+        steps: ['Mendekati pohon...', 'Menebang dengan kapak...', 'Mengumpulkan kayu...'] },
+    fish: { icon: '🎣', iconClass: 'act-fish', actionEmoji: '🐟', title: 'Fishing', color: '#2f8fc2', color2: '#6fc3ef', cd: 30,
+        steps: ['Melempar kail...', 'Menunggu sambaran...', 'Menarik hasil tangkapan!'] },
 };
-let gatherBusy = {};
+// Tombol mine/chop/fish HARUS dianggap terkunci sampai cooldown-nya berhasil
+// disinkronkan dari server (lihat syncGatherCooldowns). Tanpa flag ini, ada celah
+// waktu di mana tombol sempat ke-render "bisa dipencet" sebelum sync jalan.
+let gatherBusy = { mine: true, chop: true, fish: true };
 const gatherTimers = {};
 const GATHER_LAST_FIELD = { mine: 'lastMining', chop: 'lastWood', fish: 'lastFish' };
+const GATHER_BTN_ID   = { mine: 'btnMine', chop: 'btnChop', fish: 'btnFish' };
+const GATHER_LABEL_ID = { mine: 'cdMine', chop: 'cdChop', fish: 'cdFish' };
+const GATHER_IDLE_TEXT = { mine: 'Butuh Pickaxe', chop: 'Butuh Axe', fish: 'Butuh Fishing Rod' };
 
 function senderId() { return currentUser?.senderId; }
 
 // Dipanggil setiap kali karakter di-load (termasuk setelah refresh) supaya
 // cooldown mine/chop/fish tetap akurat berdasarkan timestamp dari server,
-// bukan cuma timer JS yang ke-reset waktu page reload.
+// bukan cuma timer JS yang ke-reset waktu page reload. Sebelum fungsi ini
+// jalan, tombol selalu dianggap locked (lihat default gatherBusy di atas)
+// supaya tidak ada window di mana tombol bisa dipencet padahal masih CD.
 function syncGatherCooldowns(u) {
     const now = Date.now();
     Object.entries(GATHER_LABEL).forEach(([type, info]) => {
@@ -556,115 +577,12 @@ function syncGatherCooldowns(u) {
             startGatherCooldown(type, secondsLeft);
         } else {
             gatherBusy[type] = false;
-            const btn = $(type === 'mine' ? 'btnMine' : type === 'chop' ? 'btnChop' : 'btnFish');
-            const label = $(type === 'mine' ? 'cdMine' : type === 'chop' ? 'cdChop' : 'cdFish');
+            const btn = $(GATHER_BTN_ID[type]);
+            const label = $(GATHER_LABEL_ID[type]);
             if (btn) btn.disabled = false;
-            if (label) label.textContent = type === 'mine' ? 'Butuh Pickaxe' : type === 'chop' ? 'Butuh Axe' : 'Butuh Fishing Rod';
+            if (label) label.textContent = GATHER_IDLE_TEXT[type];
         }
     });
-}
-
-function showGatherOverlay(type) {
-    const info = GATHER_LABEL[type];
-    const stage = document.querySelector('.gather-stage');
-    stage.classList.remove('result-pop');
-    $('gatherBg').className = `gather-bg bg-${type}`;
-    $('gatherIcon').className = `gather-icon anim-${type}`;
-    $('gatherIcon').textContent = info.icon;
-    $('gatherActionIcon').className = `gather-action-icon anim-${type}`;
-    $('gatherActionIcon').textContent = info.actionIcon;
-    $('gatherCaption').textContent = info.caption;
-    const oldResult = document.querySelector('.gather-result-text');
-    if (oldResult) oldResult.remove();
-    $('gatherOverlay').style.display = 'flex';
-}
-
-function hideGatherOverlay() {
-    $('gatherOverlay').style.display = 'none';
-}
-
-async function doGather(type) {
-    if (!currentUser) return;
-    if (gatherBusy[type]) return;
-    const btn = $(type === 'mine' ? 'btnMine' : type === 'chop' ? 'btnChop' : 'btnFish');
-    btn.disabled = true;
-
-    showGatherOverlay(type);
-    const info = GATHER_LABEL[type];
-    // Minimal durasi animasi biar ada "suspense", sambil request jalan paralel
-    const animDelay = new Promise(r => setTimeout(r, 1400));
-
-    try {
-        const fetchPromise = fetch('/api/gather', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senderId: senderId(), type }),
-        }).then(r => r.json());
-
-        const [, data] = await Promise.all([animDelay, fetchPromise]);
-
-        // Fishing punya "sentakan" sesaat sebelum reveal hasil
-        if (type === 'fish') {
-            $('gatherActionIcon').classList.add('fish-bite');
-            await new Promise(r => setTimeout(r, 500));
-        }
-
-        const stage = document.querySelector('.gather-stage');
-        stage.classList.add('result-pop');
-
-        if (!data.ok) {
-            $('gatherIcon').textContent = '❌';
-            $('gatherCaption').textContent = data.error;
-            $('gatherActionIcon').style.display = 'none';
-            await new Promise(r => setTimeout(r, 1300));
-            hideGatherOverlay();
-            $('gatherActionIcon').style.display = '';
-            showLifeLog(`❌ ${data.error}`);
-            if (data.cooldownLeft) startGatherCooldown(type, data.cooldownLeft);
-            else btn.disabled = false;
-            return;
-        }
-
-        if (data.empty) {
-            $('gatherIcon').textContent = '😔';
-            $('gatherActionIcon').style.display = 'none';
-            $('gatherCaption').textContent = 'Tidak ada hasil...';
-            showLifeLog(`${info.icon} ${data.message}`);
-        } else {
-            const topReward = data.rewards[0];
-            $('gatherIcon').textContent = info.icon;
-            $('gatherActionIcon').style.display = '';
-            $('gatherActionIcon').classList.remove('fish-bite');
-            $('gatherActionIcon').textContent = REWARD_EMOJI[topReward.key] || info.actionIcon;
-            $('gatherCaption').textContent = `+${topReward.amount}x ${topReward.name}${data.rewards.length > 1 ? ` (+${data.rewards.length - 1} lainnya)` : ''}`;
-
-            const resultEl = document.createElement('div');
-            resultEl.className = 'gather-result-text';
-            resultEl.textContent = `✨ +${data.expText} EXP`;
-            document.querySelector('.gather-stage').appendChild(resultEl);
-
-            const lines = data.rewards.map(r => `+${r.amount}x ${r.name}`).join(', ');
-            let html = `${info.icon} <b>${info.title}</b> — ${lines}<br>✨ Exp ${data.expText}`;
-            if (data.durability?.msg) html += `<br><span class="warn-text">${data.durability.msg}</span>`;
-            if (data.levelUpLog?.length) html += `<br>⭐ ${data.levelUpLog.map(l => l.text).join(' ')}`;
-            showLifeLog(html);
-            currentUser = { ...currentUser, ...data.user };
-            updateCharStats(currentUser);
-            $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
-            // Sinkronkan ulang cooldown dari timestamp server (bukan hanya timer JS lokal)
-            syncGatherCooldowns(currentUser);
-        }
-
-        await new Promise(r => setTimeout(r, 1600));
-        hideGatherOverlay();
-        $('gatherActionIcon').style.display = '';
-
-        startGatherCooldown(type, Math.floor((data.cooldown || info.cd * 1000) / 1000));
-    } catch (e) {
-        hideGatherOverlay();
-        showLifeLog('❌ Gagal terhubung ke server.');
-        btn.disabled = false;
-    }
 }
 
 const REWARD_EMOJI = {
@@ -675,10 +593,90 @@ const REWARD_EMOJI = {
     hiu: '🦈', paus: '🐳', leviathan: '🐉', trash: '🗑️',
 };
 
+async function doGather(type) {
+    if (!currentUser) return;
+    if (gatherBusy[type]) return;
+    const info = GATHER_LABEL[type];
+    const btn  = $(GATHER_BTN_ID[type]);
+    btn.disabled = true;
+    gatherBusy[type] = true; // lock optimis selagi request berjalan, sebelum CD asli diset
+
+    const overlay = showActivityAnim({
+        icon: info.icon, iconClass: info.iconClass, title: info.title,
+        color: info.color, color2: info.color2, duration: 2.2,
+        steps: info.steps,
+    });
+
+    try {
+        const res = await fetch('/api/gather', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), type }),
+        });
+        const data = await res.json();
+
+        await new Promise(r => setTimeout(r, 2200));
+
+        if (!data.ok) {
+            closeActivityAnim(overlay);
+            showLifeLog(`❌ ${data.error}`);
+            if (data.cooldownLeft) {
+                startGatherCooldown(type, data.cooldownLeft);
+            } else {
+                gatherBusy[type] = false;
+                btn.disabled = false;
+            }
+            return;
+        }
+
+        if (data.empty) {
+            if (data.user) currentUser = { ...currentUser, ...data.user };
+            showActivityResult(overlay, {
+                isRare: false,
+                rows: [{ label: `${info.icon} ${info.title}`, val: 'Tidak ada hasil' }],
+            });
+            showLifeLog(`${info.icon} ${data.message}`);
+        } else {
+            currentUser = { ...currentUser, ...data.user };
+            updateCharStats(currentUser);
+            $('charLevel').textContent = `Level ${currentUser.level} · ${currentUser.exp} EXP`;
+
+            const lvlUp = data.levelUpLog?.length ? `🎉 LEVEL UP! → Lv${currentUser.level}` : null;
+            showActivityResult(overlay, {
+                isRare: data.rewards.length > 1,
+                rows: [
+                    ...data.rewards.map(r => ({
+                        label: `${REWARD_EMOJI[r.key] || info.actionEmoji} ${r.name}`,
+                        val: `+${r.amount}x`,
+                        float: REWARD_EMOJI[r.key] || info.actionEmoji,
+                    })),
+                    { label: '✨ EXP', val: `+${data.expText}`, cls: 'green', float: '✨' },
+                ],
+                levelUp: lvlUp,
+            });
+
+            const lines = data.rewards.map(r => `+${r.amount}x ${r.name}`).join(', ');
+            let html = `${info.icon} <b>${info.title}</b> — ${lines}<br>✨ Exp ${data.expText}`;
+            if (data.durability?.msg) html += `<br><span class="warn-text">${data.durability.msg}</span>`;
+            if (data.levelUpLog?.length) html += `<br>⭐ ${data.levelUpLog.map(l => l.text).join(' ')}`;
+            showLifeLog(html);
+        }
+
+        // Cooldown SELALU dipasang dari nilai yang dikirim server, supaya tombol
+        // langsung terkunci sesaat hasil keluar (tidak ada celah bisa dobel-klik).
+        startGatherCooldown(type, Math.floor((data.cooldown || info.cd * 1000) / 1000));
+    } catch (e) {
+        closeActivityAnim(overlay);
+        showLifeLog('❌ Gagal terhubung ke server.');
+        gatherBusy[type] = false;
+        btn.disabled = false;
+    }
+}
+
 function startGatherCooldown(type, seconds) {
     gatherBusy[type] = true;
-    const btn = $(type === 'mine' ? 'btnMine' : type === 'chop' ? 'btnChop' : 'btnFish');
-    const label = $(type === 'mine' ? 'cdMine' : type === 'chop' ? 'cdChop' : 'cdFish');
+    const btn = $(GATHER_BTN_ID[type]);
+    const label = $(GATHER_LABEL_ID[type]);
     btn.disabled = true;
     let left = seconds;
 
@@ -690,8 +688,7 @@ function startGatherCooldown(type, seconds) {
             clearInterval(gatherTimers[type]);
             gatherBusy[type] = false;
             btn.disabled = false;
-            label.textContent = GATHER_LABEL[type].title === 'Mining' ? 'Butuh Pickaxe' :
-                GATHER_LABEL[type].title === 'Woodcut' ? 'Butuh Axe' : 'Butuh Fishing Rod';
+            label.textContent = GATHER_IDLE_TEXT[type];
         } else {
             label.textContent = `⏳ ${left}s`;
         }
@@ -810,7 +807,7 @@ async function doHarvestAll() {
 //  ACTIVITY ANIMATION ENGINE
 // ════════════════════════════════════════
 
-function showActivityAnim({ icon, title, color, color2, steps, duration }) {
+function showActivityAnim({ icon, iconClass, title, color, color2, steps, duration }) {
     // Remove old overlay if any
     document.getElementById('actOverlay')?.remove();
 
@@ -818,7 +815,7 @@ function showActivityAnim({ icon, title, color, color2, steps, duration }) {
     overlay.id = 'actOverlay';
     overlay.innerHTML = `
         <div class="act-panel" style="--act-color:${color};--act-color2:${color2||color};--act-duration:${duration||2.4}s">
-            <div class="act-icon-wrap"><span class="act-icon">${icon}</span></div>
+            <div class="act-icon-wrap"><span class="act-icon${iconClass ? ' ' + iconClass : ''}">${icon}</span></div>
             <div class="act-title">${title}</div>
             <div class="act-progress-wrap"><div class="act-progress-bar"></div></div>
             <div class="act-steps" id="actSteps"></div>
@@ -1175,7 +1172,7 @@ async function showStatsPage() {
         const eqHtml = data.equipment.map(e => `
             <div class="stat-eq-row">
                 <span>${e.icon} <b>${e.slot.toUpperCase()}</b></span>
-                <span>${e.name}${e.tier ? ` [T${e.tier}]` : ''}${e.dura !== null ? ` (${e.dura}/${e.maxDura})` : ''}</span>
+                <span>${e.name}${e.tier ? ` [T${e.tier}]` : ''}${e.dura !== null ? ` (${e.dura}${e.maxDura ? `/${e.maxDura}` : ''} dura)` : ''}</span>
             </div>`).join('') || '<p style="opacity:.5">Belum ada equipment</p>';
 
         const passiveHtml = data.passives.map(pa =>
