@@ -103,14 +103,14 @@ function applyAilment(b, logLines) {
     if (b.monsterAilment.turns <= 0) b.monsterAilment = null;
 }
 
-function doPlayerAttack(b, user, isSkill = false, skillData = null, logLines = []) {
+function doPlayerAttack(b, user, isSkill = false, skillData = null, logLines = [], currentMode = 'hunt') {
     let dmg = Math.floor(user.atk * (isSkill && skillData?.damage ? skillData.damage : (0.9 + Math.random() * 0.3)));
 
     // Crit chance — Archer: Focus +10% lvl20
     const critBonus = (user.role === 'archer' && user.level >= 20) ? 0.10 : 0;
     let isCrit = Math.random() < (user.critRate + critBonus);
-    // Crit damage — Assassin: Lethal Precision +50% lvl5 (base mult 2.0x)
-    const critMult = (user.role === 'assassin' && user.level >= 5) ? 2.5 : 2.0;
+    // Crit damage — Assassin: Lethal Precision lvl5 → x2.2 (bot pakai 2.2, bukan 2.5)
+    const critMult = (user.role === 'assassin' && user.level >= 5) ? 2.2 : 2.0;
     if (isCrit) dmg = Math.floor(dmg * critMult);
 
     // Fighter passive: Combat Flow
@@ -119,12 +119,23 @@ function doPlayerAttack(b, user, isSkill = false, skillData = null, logLines = [
         dmg = Math.floor(dmg * (1 + b.combatFlow));
     }
 
+    // Assassin passive: Execute lvl25 — DMG +25% saat monster HP < 50%
+    if (user.role === 'assassin' && user.level >= 25 && b.monsterHp / b.monsterMaxHp < 0.5) {
+        dmg = Math.floor(dmg * 1.25);
+    }
+
     // Mage passive: Arcane Focus on skills
     if (isSkill && user.role === 'mage' && user.level >= 20) dmg = Math.floor(dmg * 1.15);
 
     // Archer passive: Eagle Eye — ignore 15% monster def
     const mDefReduce = (user.role === 'archer' && user.level >= 5) ? 0.85 : 1.0;
-    const mDef = Math.floor((b.monsterDef || 0) * mDefReduce);
+    // DEF musuh: untuk dungeon pakai formula floor-based sama dengan bot (20 + floor*20)
+    // untuk mode lain pakai def dari data monster
+    let rawMonsterDef = b.monsterDef || 0;
+    if (currentMode === 'dungeon') {
+        rawMonsterDef = Math.floor(20 + ((b.floor || 1) * 20));
+    }
+    const mDef = Math.floor(rawMonsterDef * mDefReduce);
     const finalDmg = Math.max(1, dmg - mDef);
 
     b.monsterHp -= finalDmg;
@@ -184,12 +195,12 @@ module.exports = async (req, res) => {
 
         // ─── PLAYER ACTION ───
         if (action === 'attack') {
-            doPlayerAttack(b, user, false, null, logLines);
+            doPlayerAttack(b, user, false, null, logLines, mode);
 
             // Speed-based extra attack chance
             if (user.speed > 1.0 && Math.random() < (user.speed - 1) * 0.5) {
                 logLines.push({ type: 'system', text: '⚡ Extra Attack!' });
-                doPlayerAttack(b, user, false, null, logLines);
+                doPlayerAttack(b, user, false, null, logLines, mode);
             }
 
         } else if (action === 'defend') {
@@ -235,7 +246,7 @@ module.exports = async (req, res) => {
                 refreshStats(user, b);
                 logLines.push({ type: 'skill', text: `✨ ${skill.name.toUpperCase()}! Speed x${skill.power} (sisa battle)` });
             } else {
-                doPlayerAttack(b, user, true, skill, logLines);
+                doPlayerAttack(b, user, true, skill, logLines, mode);
             }
 
             // Status effects
@@ -253,7 +264,8 @@ module.exports = async (req, res) => {
             }
 
         } else if (action === 'flee') {
-            const baseChance = b.isBoss ? 0.15 : 0.4;
+            // Flee chance sesuai bot: non-boss 50%, boss 20%
+            const baseChance = b.isBoss ? 0.2 : 0.5;
             const escapeChance = baseChance + ((user.speed - 1) * 0.1);
             if (Math.random() < escapeChance) {
                 fleeSuccess = true;

@@ -35,6 +35,26 @@ module.exports = async (req, res) => {
 
         recalculateStats(user);
 
+        // ─── COOLDOWN CHECK (sesuai bot WA) ───
+        const BATTLE_CD = {
+            hunt:    90000,   // 1.5 menit
+            dungeon: 180000,  // 3 menit
+            beast:   300000,  // 5 menit
+            horde:   600000,  // 10 menit
+        };
+        const LAST_FIELD = {
+            hunt: 'lastHunt', dungeon: 'lastDungeon', beast: 'lastBoss', horde: 'lastHorde',
+        };
+        const cdMs  = BATTLE_CD[mode];
+        const lastTs = user[LAST_FIELD[mode]] || 0;
+        const sisaMs = cdMs - (Date.now() - lastTs);
+        if (sisaMs > 0 && !db[BATTLE_TYPE_MAP[mode]]?.[senderId]) {
+            const menit = Math.floor(sisaMs / 60000);
+            const detik = Math.floor((sisaMs % 60000) / 1000);
+            const sisaTeks = menit > 0 ? `${menit}m ${detik}s` : `${detik}s`;
+            return res.status(400).json({ error: `⏳ Aura belum pulih. Tunggu ${sisaTeks} lagi.`, cooldownLeft: Math.ceil(sisaMs / 1000) });
+        }
+
         // Check sudah ada battle
         const bt = BATTLE_TYPE_MAP[mode];
         if (db[bt]?.[senderId]) return res.status(400).json({ error: `Kamu masih dalam pertarungan ${mode}!` });

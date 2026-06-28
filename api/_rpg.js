@@ -97,8 +97,9 @@ const roleData = {
         description: 'Penari bayangan yang menyelesaikan pertempuran sebelum musuh menyadarinya.',
         stats: { hp: 0.9, atk: 1.1, def: 0.8, speed: 1.4, crit: 0.17 },
         passives: {
-            5:  { name: 'Lethal Precision', description: 'Crit damage +50%.', critDmg: 0.5 },
-            20: { name: 'Invisibility',     description: 'Dodge chance +20%.', dodge: 0.2 }
+            5:  { name: 'Lethal Precision', description: 'Crit damage x2.2 (base x2.0).', critDmg: 0.5 },
+            20: { name: 'Invisibility',     description: 'Dodge chance +20%.', dodge: 0.2 },
+            25: { name: 'Execute',          description: 'DMG +25% saat HP musuh di bawah 50%.', executeBonus: 0.25 }
         },
         skills: {
             5:  { name: 'Quick Stab',     mana: 40,  damage: 1.2, cd: 7000,  description: '1.2x damage.' },
@@ -348,9 +349,131 @@ function getRandomLoot(isBoss, floor = 1) {
     return drops;
 }
 
+// ─── EXPLORE ───────────────────────────────────────────────────────────────
+const EXPLORE_COOLDOWN = 120000; // 2 menit (sama dengan bot)
+const EXPLORE_LOCATIONS = [
+    { name: 'Emeralda Village',           gold: 500,   exp: 100,   item: 'Apple',           drop: 'wood'          },
+    { name: 'Whispering Woods',           gold: 650,   exp: 220,   item: 'Blueberries',     drop: 'leaf'          },
+    { name: 'Goblin Iron Mine',           gold: 750,   exp: 300,   item: 'Stone',           drop: 'iron'          },
+    { name: 'Slime Marshland',            gold: 800,   exp: 350,   item: 'Slime Ball',      drop: 'clay'          },
+    { name: 'Kingdom of Astralia',        gold: 1200,  exp: 600,   item: 'Wine',            drop: 'silver'        },
+    { name: 'Frozen Tundra of Niflheim',  gold: 1500,  exp: 800,   item: 'Ancient Ice',     drop: 'steel'         },
+    { name: 'Burning Ember Peaks',        gold: 1800,  exp: 1000,  item: 'Sulfur',          drop: 'coal'          },
+    { name: 'Sunken Ruins of Atlantis',   gold: 2200,  exp: 1300,  item: 'Jade',            drop: 'gold_ore'      },
+    { name: 'Great Sage Library',         gold: 2500,  exp: 1800,  item: 'Papyrus',         drop: 'mana_crystal'  },
+    { name: "Dragon's Nest Crater",       gold: 4000,  exp: 3000,  item: 'Dragon Scale',    drop: 'gold_bar'      },
+    { name: 'Cursed Shadow Valley',       gold: 4500,  exp: 3500,  item: 'Dark Matter',     drop: 'obsidian_ore'  },
+    { name: 'Holy Sanctuary of Eden',     gold: 5000,  exp: 4000,  item: 'Golden Feather',  drop: 'mythril'       },
+    { name: 'Valley of the Immortals',    gold: 6000,  exp: 5500,  item: 'Ginseng',         drop: 'diamond'       },
+    { name: 'Void Abyss Dimension',       gold: 10000, exp: 8000,  item: 'Void Crystal',    drop: 'astral_shard'  },
+    { name: 'Chrono Rift Sanctuary',      gold: 15000, exp: 12000, item: 'Chrono Dust',     drop: 'infinity_stone'},
+    { name: 'Heavenly Realm Gate',        gold: 25000, exp: 20000, item: 'Celestial Tear',  drop: 'god_soul'      },
+    { name: 'Hell Gate Pandemonium',      gold: 30000, exp: 25000, item: 'Demon Lord Horn', drop: 'abyss_heart'   },
+    { name: 'The Origin Tree Root',       gold: 50000, exp: 45000, item: 'World Tree Root', drop: 'genesis_seed'  },
+    { name: 'The Omi Workshop',           gold: 75000, exp: 60000, item: 'Titan Blood',     drop: 'omni_core'     },
+];
+
+// ─── ADVENTURE ─────────────────────────────────────────────────────────────
+const ADVENTURE_COOLDOWN = 60000; // 1 menit (sama dengan bot)
+const ADVENTURE_EVENTS = [
+    { msg: 'menemukan markas bandit',                                       gold: 500,  exp: 99,  hp: -20 },
+    { msg: 'menjelajahi gua tua',                                           gold: 800,  exp: 80,  hp: -10 },
+    { msg: 'menemukan reruntuhan kuno',                                     gold: 1200, exp: 90,  hp: -25 },
+    { msg: 'memasuki dungeon kecil',                                        gold: 900,  exp: 200, hp: -35 },
+    { msg: 'membantu warga desa dari serangan serigala',                    gold: 600,  exp: 150, hp: -15 },
+    { msg: 'menemukan peti harta karun karam di tepi sungai',               gold: 2500, exp: 50,  hp: -5  },
+    { msg: 'tersesat di hutan kabut dan diserang tanaman merambat',         gold: 300,  exp: 300, hp: -40 },
+    { msg: 'menemukan kuil tersembunyi yang dijaga oleh golem',             gold: 1800, exp: 500, hp: -50 },
+    { msg: 'mencuri simpanan makanan ogre yang sedang tidur',               gold: 1500, exp: 120, hp: -10 },
+    { msg: 'menyelamatkan pedagang yang kereta kudanya terbalik',           gold: 2000, exp: 250, hp: -20 },
+    { msg: 'menjelajahi reruntuhan kastil yang berhantu',                   gold: 1100, exp: 450, hp: -45 },
+    { msg: 'menemukan air terjun ajaib yang menyegarkan (sedikit luka)',   gold: 400,  exp: 100, hp: -2  },
+];
+
+// ─── HUNT ANIMAL ───────────────────────────────────────────────────────────
+const HUNT_ANIMAL_COOLDOWN = 30000; // 30 detik (sama dengan bot)
+const HUNT_ANIMALS = [
+    { name: 'Ayam',      meat: 'chicken_meat',   qty: 2,  exp: 5   },
+    { name: 'Bebek',     meat: 'duck_meat',       qty: 2,  exp: 6   },
+    { name: 'Kelinci',   meat: 'rabbit_meat',     qty: 1,  exp: 8   },
+    { name: 'Kambing',   meat: 'mutton',           qty: 3,  exp: 15  },
+    { name: 'Sapi',      meat: 'beef',             qty: 5,  exp: 25  },
+    { name: 'Babi Hutan',meat: 'pork',             qty: 4,  exp: 20  },
+    { name: 'Rusa',      meat: 'venison',          qty: 4,  exp: 35  },
+    { name: 'Kuda Liar', meat: 'horse_meat',       qty: 7,  exp: 45  },
+    { name: 'Gajah',     meat: 'elephant_meat',    qty: 15, exp: 100 },
+    { name: 'Jerapah',   meat: 'giraffe_meat',     qty: 10, exp: 80  },
+];
+
+// ─── SELL PRICES (disalin persis dari bot) ─────────────────────────────────
+const SELL_PRICES = {
+    // 🪨 MINING & MINERALS
+    stone: 5, iron: 20, copper: 15, silver: 40, gold_ore: 80,
+    steel: 150, coal: 15, stick: 3, string: 8, clay: 10,
+    obsidian_ore: 500, gunpowder: 60, bone: 20, slime_ball: 30,
+    sapphire: 150, ruby: 180, emerald: 220, diamond: 800,
+    mythril: 2500, jade: 300, gold_bar: 4000, ancient_coin: 1500,
+    // 🎣 FISHING
+    lele: 15, nila: 20, mujair: 25, gurame: 45, patin: 45,
+    bandeng: 35, tongkol: 60, salmon: 100, tuna: 120,
+    hiu: 600, paus: 1500, leviathan: 7000, trash: 2,
+    // 🌾 FARMING
+    wheat: 15, carrot: 25, potato: 28, corn: 40, tomato: 45,
+    pumpkin: 80, melon: 110, beetroot: 130, chocolate: 250,
+    coconut: 500, pizza_slice: 35, turkish_delight: 80,
+    // 🌳 FORAGING & FRUITS
+    wood: 6, leaf: 3, cherry: 10, blueberry: 9, blueberries: 15,
+    apple: 12, orange: 18, mango: 30, guava: 25, nest: 60,
+    ginseng: 400, maple_syrup: 120,
+    // 🥩 HUNTING & RAW MEAT
+    chicken_meat: 18, duck_meat: 22, rabbit_meat: 25, mutton: 30,
+    beef: 55, pork: 40, venison: 80, horse_meat: 90, camel_meat: 100,
+    turkey_meat: 45, poultry: 15, elephant_meat: 300, giraffe_meat: 250,
+    leather: 60, kangaroo_pouch: 250,
+    // 🍳 COOKED FOOD
+    steak: 120, fish_soup: 80, bread: 40, roasted_chicken: 90, fruit_salad: 60,
+    // 🦠 LOW-TIER MONSTER LOOT
+    goblin_ear: 15, wolf_fang: 20, spider_web: 12, bat_wing: 18,
+    orc_skin: 30, harpy_feather: 35, zombie_flesh: 10, skull: 25,
+    rat_tail: 8, snake_scale: 22,
+    // 👹 MID-TIER MONSTER LOOT
+    troll_blood: 80, minotaur_horn: 150, griffin_claw: 180, basilisk_scale: 200,
+    chimera_tail: 190, gargoyle_stone: 120, vampire_fang: 160, werewolf_pelt: 140, golem_core: 350,
+    // 🧪 ALCHEMY & HERBS
+    red_mushroom: 20, glowing_mushroom: 45, venom_sac: 50,
+    moonflower: 120, mandrake_root: 150, fairy_dust: 80, elf_tear: 250,
+    // 🔮 ELEMENTAL CORES
+    fire_core: 400, ice_core: 400, thunder_core: 400, wind_core: 400,
+    earth_core: 400, shadow_core: 500, light_core: 500, magic_scroll: 300,
+    // ⚙️ SCRAP & JUNK
+    broken_sword: 8, rusted_armor: 12, torn_cloth: 4, scrap_metal: 7,
+    glass_shard: 5, empty_bottle: 3,
+    // 🎭 MISC & EXPLORATION
+    batik: 200, katana_fragment: 800, tech_parts: 700, vodka: 120,
+    wine: 220, golden_feather: 1200, sombrero: 90, papyrus: 150,
+    oil_barrel: 900, ancient_ice: 1800, mana_crystal: 2500,
+    // 👑 BOSS DROPS & SUPER RARE
+    dragon_scale: 4000, dark_matter: 5000, unicorn_horn: 6500,
+    void_crystal: 8000, astral_shard: 10000, chrono_dust: 13000,
+    infinity_stone: 18000, god_soul: 25000, omni_core: 20000,
+    genesis_seed: 18000, abyss_heart: 30000,
+    the_creator_spark: 75000, excalibur_fragment: 120000,
+    dragon_heart: 180000, phoenix_ashes: 150000,
+    demon_lord_horn: 200000, celestial_tear: 250000,
+    dark_orbit_core: 220000, world_tree_root: 210000,
+    nebulium_ingot: 300000, titan_blood: 240000, pandora_box: 400000,
+};
+
+// Item yang tidak boleh dijual
+const SELL_PROTECTED = ['item_box', 'spatial_ring', 'divine_eye', 'elixir_of_rebirth', 'chronos_hourglass'];
+
 module.exports = {
     roleData, recalculateStats, applyBattleBuffs, useSkillRPG, getReqExp, levelUpCheck,
     getEquippedItem, decreaseDurability,
     ORE_TABLE, WOOD_TABLE, FISH_TABLE, PLANT_TABLE, GATHER_COOLDOWN,
-    HUNT_MONSTERS, DUNGEON_MONSTERS, BOSS_MONSTERS, getRandomLoot
+    HUNT_MONSTERS, DUNGEON_MONSTERS, BOSS_MONSTERS, getRandomLoot,
+    EXPLORE_LOCATIONS, EXPLORE_COOLDOWN,
+    ADVENTURE_EVENTS, ADVENTURE_COOLDOWN,
+    HUNT_ANIMALS, HUNT_ANIMAL_COOLDOWN,
+    SELL_PRICES, SELL_PROTECTED,
 };
