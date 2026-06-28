@@ -467,6 +467,137 @@ const SELL_PRICES = {
 // Item yang tidak boleh dijual
 const SELL_PROTECTED = ['item_box', 'spatial_ring', 'divine_eye', 'elixir_of_rebirth', 'chronos_hourglass'];
 
+// ─── SHOP (disalin persis dari shopItems di bot rpg.js) ────────────────────
+const SHOP_ITEMS = {
+    // --- CONSUMABLES ---
+    // ❤️ HEAL
+    lux:   { name: 'Lux',   price: 120,  effect: 'heal', value: 40 },
+    nox:   { name: 'Nox',   price: 350,  effect: 'heal', value: 110 },
+    umbra: { name: 'Umbra', price: 900,  effect: 'heal', value: 240 },
+    drain: { name: 'Drain', price: 2000, effect: 'heal', value: 420 },
+
+    // 🔵 MANA
+    flux:  { name: 'Flux',  price: 200,  effect: 'fillmana', value: 60 },
+    veil:  { name: 'Veil',  price: 700,  effect: 'fillmana', value: 150 },
+    rift:  { name: 'Rift',  price: 1600, effect: 'fillmana', value: 300 },
+    surge: { name: 'Surge', price: 3500, effect: 'fillmana', value: 550 },
+
+    // 🧠 MAX MANA / POWER (LIMIT: 10x/HARI)
+    core:  { name: 'Core',  price: 12000, effect: 'maxmana', value: 25 },
+    relic: { name: 'Relic', price: 30000, effect: 'maxmana', value: 60 },
+    nexus: { name: 'Nexus', price: 60000, effect: 'maxmana', value: 120 },
+
+    // --- AKSESORIS & LAHAN ---
+    farm_plot: { name: 'Lahan Pertanian', price: 1000, effect: 'land', value: 1 },
+
+    // --- EQUIPMENT / ACCESSORIES (LIMIT: 3x/HARI) ---
+    // ⚔️ ATK
+    fang:  { name: 'Fang',  price: 8000,  effect: 'atk', value: 5 },
+    claw:  { name: 'Claw',  price: 15000, effect: 'atk', value: 12 },
+    reign: { name: 'Reign', price: 30000, effect: 'atk', value: 28 },
+
+    // 🛡️ DEF
+    hide:  { name: 'Hide',  price: 2000,  effect: 'def', value: 6 },
+    shell: { name: 'Shell', price: 6000,  effect: 'def', value: 15 },
+    aegis: { name: 'Aegis', price: 20000, effect: 'def', value: 38 },
+
+    // --- SEEDS (BIBIT) ---
+    wheat_seeds:    { name: 'Wheat Seeds',    price: 25,  effect: 'seed', value: 1 },
+    carrot_seeds:   { name: 'Carrot Seeds',   price: 40,  effect: 'seed', value: 1 },
+    potato_seeds:   { name: 'Potato Seeds',   price: 45,  effect: 'seed', value: 1 },
+    corn_seeds:     { name: 'Corn Seeds',     price: 60,  effect: 'seed', value: 1 },
+    tomato_seeds:   { name: 'Tomato Seeds',   price: 80,  effect: 'seed', value: 1 },
+    pumpkin_seeds:  { name: 'Pumpkin Seeds',  price: 120, effect: 'seed', value: 1 },
+    melon_seeds:    { name: 'Melon Seeds',    price: 150, effect: 'seed', value: 1 },
+    beetroot_seeds: { name: 'Beetroot Seeds', price: 200, effect: 'seed', value: 1 },
+    cocoa_beans:    { name: 'Cocoa Beans',    price: 350, effect: 'seed', value: 1 },
+    coconut_seeds:  { name: 'Coconut Seeds',  price: 800, effect: 'seed', value: 1 },
+
+    // --- BASIC MATERIALS ---
+    wood: { name: 'Wood', price: 20, effect: 'material', value: 1 },
+    stone: { name: 'Stone', price: 20, effect: 'material', value: 1 },
+    leaf: { name: 'Leaf', price: 10, effect: 'material', value: 1 },
+    stick: { name: 'Stick', price: 10, effect: 'material', value: 1 },
+    string: { name: 'String', price: 25, effect: 'material', value: 1 },
+    clay: { name: 'Clay', price: 30, effect: 'material', value: 1 },
+    coal: { name: 'Coal', price: 40, effect: 'material', value: 1 },
+    leather: { name: 'Leather', price: 100, effect: 'material', value: 1 },
+    bone: { name: 'Bone', price: 100, effect: 'material', value: 1 },
+    iron: { name: 'Iron', price: 150, effect: 'material', value: 1 },
+    copper: { name: 'Copper', price: 120, effect: 'material', value: 1 },
+    silver: { name: 'Silver', price: 300, effect: 'material', value: 1 },
+    steel: { name: 'Steel', price: 450, effect: 'material', value: 1 },
+    gold_ore: { name: 'Gold Ore', price: 500, effect: 'material', value: 1 },
+
+    // --- 🔥 RARE & EPIC MATERIALS (LIMIT: 20x/HARI) 🔥 ---
+    obsidian_ore: { name: 'Obsidian Ore', price: 2500, effect: 'rare_mat', value: 1 },
+    diamond: { name: 'Diamond', price: 4000, effect: 'rare_mat', value: 1 },
+    ancient_coin: { name: 'Ancient Coin', price: 7500, effect: 'rare_mat', value: 1 },
+    ancient_ice: { name: 'Ancient Ice', price: 9000, effect: 'rare_mat', value: 1 },
+    mythril: { name: 'Mythril', price: 12500, effect: 'rare_mat', value: 1 },
+    mana_crystal: { name: 'Mana Crystal', price: 15000, effect: 'rare_mat', value: 1 },
+    dragon_scale: { name: 'Dragon Scale', price: 25000, effect: 'rare_mat', value: 1 },
+    dark_matter: { name: 'Dark Matter', price: 35000, effect: 'rare_mat', value: 1 },
+    void_crystal: { name: 'Void Crystal', price: 60000, effect: 'rare_mat', value: 1 },
+    astral_shard: { name: 'Astral Shard', price: 85000, effect: 'rare_mat', value: 1 },
+
+    // --- SPECIAL ITEMS (LIMIT: 1x/HARI) ---
+    spatial_ring: { name: 'Spatial Ring', price: 2500000, effect: 'special', value: 1 },
+    change_role: { name: 'Scroll of Rebirth', price: 999999, effect: 'special', value: 1 },
+
+    // --- KEYS (LIMIT: 5x/HARI) ---
+    key_common: { name: 'Common Key', price: 2500, effect: 'key', value: 1 },
+    key_uncommon: { name: 'Uncommon Key', price: 7500, effect: 'key', value: 1 },
+
+    // --- 🧚 FAIRY WORLD ---
+    fairy_coin: { name: 'Fairy Coin', price: 10000, effect: 'fairy', value: 1 },
+    mana_nectar: { name: 'Mana Nectar', price: 25000, effect: 'fairy', value: 5000 },
+    ambrosia: { name: 'Ambrosia', price: 100000, effect: 'fairy', value: 50000 },
+};
+
+// Kategori shop untuk grouping di UI (persis label & icon dari bot)
+const SHOP_CATEGORIES = {
+    heal:     { icon: '❤️', label: 'Heal Potion' },
+    fillmana: { icon: '🔵', label: 'Mana Potion' },
+    maxmana:  { icon: '🧠', label: 'Power Core', limitText: 'Limit 10/hari' },
+    key:      { icon: '🔑', label: 'Keys', limitText: 'Limit 5/hari' },
+    atk:      { icon: '⚔️', label: 'Accessories ATK', limitText: 'Limit 3/hari' },
+    def:      { icon: '🛡️', label: 'Accessories DEF', limitText: 'Limit 3/hari' },
+    seed:     { icon: '🌱', label: 'Farming Seeds' },
+    material: { icon: '🪨', label: 'Basic Materials' },
+    rare_mat: { icon: '💎', label: 'Rare & Epic Materials', limitText: 'Limit 20/hari' },
+    land:     { icon: '🏞️', label: 'Lahan Farm' },
+    special:  { icon: '🌀', label: 'Special Items', limitText: 'Limit 1/hari' },
+    fairy:    { icon: '🧚', label: 'Fairy World', limitText: 'Coin 20/hari, Feed 30/hari' },
+};
+
+// Limit pembelian harian, persis dengan checkLimit() di bot
+const SHOP_DAILY_LIMITS = {
+    maxmana: 10, accessories: 3, rare_mat: 20, special: 1, keys: 5,
+    fairy_coin: 20, fairy_feed: 30,
+};
+
+// Limit key (grup mana yang dipakai counter shopLimit) per effect/item, sesuai bot
+function getShopLimitKey(itemKey, item) {
+    if (item.effect === 'maxmana') return 'maxmana';
+    if (item.effect === 'atk' || item.effect === 'def') return 'accessories';
+    if (item.effect === 'rare_mat') return 'rare_mat';
+    if (item.effect === 'special') return 'special';
+    if (item.effect === 'key') return 'keys';
+    if (item.effect === 'fairy') return itemKey === 'fairy_coin' ? 'fairy_coin' : 'fairy_feed';
+    return null; // tidak ada limit
+}
+
+// Max lahan berdasarkan level (disalin persis dari getMaxLahan() di bot)
+function getMaxLahan(level) {
+    if (level >= 99) return 30;
+    if (level >= 41) return 25;
+    if (level >= 31) return 20;
+    if (level >= 21) return 15;
+    if (level >= 11) return 10;
+    return 5;
+}
+
 module.exports = {
     roleData, recalculateStats, applyBattleBuffs, useSkillRPG, getReqExp, levelUpCheck,
     getEquippedItem, decreaseDurability,
@@ -476,4 +607,5 @@ module.exports = {
     ADVENTURE_EVENTS, ADVENTURE_COOLDOWN,
     HUNT_ANIMALS, HUNT_ANIMAL_COOLDOWN,
     SELL_PRICES, SELL_PROTECTED,
+    SHOP_ITEMS, SHOP_CATEGORIES, SHOP_DAILY_LIMITS, getShopLimitKey, getMaxLahan,
 };
