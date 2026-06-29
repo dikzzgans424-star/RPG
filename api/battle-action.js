@@ -13,6 +13,13 @@ const BATTLE_TYPE_MAP = {
     horde: 'hordeBattle',
 };
 
+// Field timestamp cooldown per mode — harus sama persis dengan yang dipakai
+// battle-start.js supaya cek cooldown saat mulai battle konsisten dengan
+// timestamp yang di-set di sini saat battle berakhir.
+const LAST_FIELD = {
+    hunt: 'lastHunt', dungeon: 'lastDungeon', beast: 'lastBoss', horde: 'lastHorde',
+};
+
 // Helper: mutasi db di-memori tanpa langsung save ke MongoDB.
 // Panggil saveRpgDB(db) SEKALI di akhir handler supaya tidak ada double-write.
 function setBattle(db, bt, senderId, data) {
@@ -264,13 +271,31 @@ module.exports = async (req, res) => {
             }
 
         } else if (action === 'flee') {
-            // Flee chance sesuai bot: non-boss 50%, boss 20%
-            const baseChance = b.isBoss ? 0.2 : 0.5;
-            const escapeChance = baseChance + ((user.speed - 1) * 0.1);
+            // Escape chance disalin PERSIS per-mode dari bot WA:
+            // - hunt:    30% base + (speed-1)*0.1
+            // - dungeon: 50% non-boss / 20% boss + (speed-1)*0.1
+            // - beast:   20% base + (speed-1)*0.08 (selalu boss)
+            // - horde:   tidak ada mekanisme "kabur" di tengah wave pada bot (cuma
+            //   bisa mundur saat intermission), tapi web ini mendukung flee di tengah
+            //   wave juga — disamakan dengan formula dungeon non-boss sebagai default aman.
+            let baseChance, speedMult;
+            if (mode === 'hunt') {
+                baseChance = 0.3; speedMult = 0.1;
+            } else if (mode === 'beast') {
+                baseChance = 0.2; speedMult = 0.08;
+            } else if (mode === 'dungeon') {
+                baseChance = b.isBoss ? 0.2 : 0.5; speedMult = 0.1;
+            } else {
+                baseChance = b.isBossWave ? 0.2 : 0.5; speedMult = 0.1;
+            }
+            const escapeChance = baseChance + ((user.speed - 1) * speedMult);
             if (Math.random() < escapeChance) {
                 fleeSuccess = true;
                 turnResult = 'flee';
                 logLines.push({ type: 'flee', text: '🏃 Berhasil kabur!' });
+                // Cooldown saat flee disalin sesuai bot: hunt/beast/horde kena cooldown,
+                // dungeon TIDAK (sengaja, biar bisa langsung coba lagi setelah kabur).
+                if (mode !== 'dungeon') user[LAST_FIELD[mode]] = Date.now();
                 setBattle(db, bt, senderId, null);
             } else {
                 logLines.push({ type: 'flee', text: '👟 Gagal kabur! Musuh menghalangi!' });
@@ -322,6 +347,7 @@ module.exports = async (req, res) => {
                         // Horde selesai
                         turnResult = 'horde_complete';
                         reward = { gold: b.totalGold, exp: b.totalExp, kills: b.totalKills, loot: {} };
+                        user.lastHorde = Date.now();
                         setBattle(db, bt, senderId, null);
                         logLines.push({ type: 'win', text: `🏆 HORDE SURVIVED! ${b.totalKills} monster dikalahkan!` });
                     }
@@ -333,6 +359,8 @@ module.exports = async (req, res) => {
                         exp  = Math.floor(500 + ((b.floor || 1) * 50));
                         loot = getRandomLoot(b.isBoss, b.floor);
                         user.dungeonFloor = (user.dungeonFloor || 1) + 1;
+                        // Dungeon TIDAK PERNAH kena cooldown saat menang (boss atau bukan)
+                        // — cooldown hanya berlaku saat kalah.
                         if (b.isBoss) logLines.push({ type: 'win', text: `🏆 BOSS DEFEATED! Floor ${b.floor} clear!` });
                         else logLines.push({ type: 'win', text: `✨ VICTORY Floor ${b.floor}!` });
                     } else if (mode === 'beast') {
@@ -351,12 +379,14 @@ module.exports = async (req, res) => {
                             gold = Math.floor(b.monster.gold * 3);
                             exp  = Math.floor(b.monster.exp * 3);
                             loot = getRandomLoot(true);
+                            user.lastBoss = Date.now(); // hanya di-set saat phase final benar-benar tuntas
                             logLines.push({ type: 'win', text: `🏆 ANCIENT BEAST DEFEATED!` });
                         }
                     } else {
                         gold = b.monster.gold;
                         exp  = b.monster.exp;
                         loot = getRandomLoot(false);
+                        user.lastHunt = Date.now();
                         logLines.push({ type: 'win', text: `✨ MONSTER DEFEATED!` });
                     }
 
@@ -379,9 +409,14 @@ module.exports = async (req, res) => {
                 levelUpCheck(user, logLines);
 
             } else if (user.hp <= 0) {
-                user.hp = 20;
+                const LOSE_HP = { hunt: 20, dungeon: 20, beast: 5, horde: 10 };
+                user.hp = LOSE_HP[mode] || 20;
                 turnResult = 'lose';
                 logLines.push({ type: 'lose', text: `💀 DEFEATED! Kamu pingsan...` });
+                // Cooldown saat kalah: semua mode kena, termasuk dungeon (sengaja
+                // beda dari bot — di web ini dungeon cuma kena cooldown saat kalah,
+                // menang floor/boss tidak pernah kena cooldown sama sekali).
+                user[LAST_FIELD[mode]] = Date.now();
                 setBattle(db, bt, senderId, null);
             } else {
                 if (turnResult !== 'next_wave' && turnResult !== 'next_phase') {
@@ -408,6 +443,7 @@ module.exports = async (req, res) => {
             // sudah dihapus dari DB dan field `battle` di atas jadi null.
             finalMonsterHp: b.monsterHp,
             finalMonsterMaxHp: b.monsterMaxHp,
+            isBoss: b.isBoss || false,
             user: {
                 hp: user.hp, maxHp: user.maxHp,
                 mana: user.mana, maxMana: user.maxMana,
@@ -416,6 +452,9 @@ module.exports = async (req, res) => {
                 level: user.level,
                 inventory: user.inventory,
                 cooldowns: user.cooldowns,
+                lastHunt: user.lastHunt, lastDungeon: user.lastDungeon,
+                lastBoss: user.lastBoss, lastHorde: user.lastHorde,
+                dungeonFloor: user.dungeonFloor,
             }
         });
 

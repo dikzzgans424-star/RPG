@@ -64,6 +64,10 @@ module.exports = async (req, res) => {
                 lastMining: user.lastMining || 0,
                 lastWood: user.lastWood || 0,
                 lastFish: user.lastFish || 0,
+                lastHunt: user.lastHunt || 0,
+                lastDungeon: user.lastDungeon || 0,
+                lastBoss: user.lastBoss || 0,
+                lastHorde: user.lastHorde || 0,
             },
             roleInfo: role ? {
                 name: role.name,
