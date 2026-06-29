@@ -31,7 +31,16 @@ function buildFarmView(user, now) {
             }),
         });
     }
-    return { farmPlots: user.farmPlots || 0, hasSpouse, plots, plantTable: PLANT_TABLE };
+
+    // Hanya kirim benih yang BENAR-BENAR dimiliki user (qty > 0) supaya
+    // picker tanam di web cuma nampilin benih yang dia punya.
+    const ownedSeeds = {};
+    Object.entries(PLANT_TABLE).forEach(([key, p]) => {
+        const qty = user.inventory?.[p.seed] || 0;
+        if (qty > 0) ownedSeeds[key] = qty;
+    });
+
+    return { farmPlots: user.farmPlots || 0, hasSpouse, plots, plantTable: PLANT_TABLE, ownedSeeds };
 }
 
 module.exports = async (req, res) => {
