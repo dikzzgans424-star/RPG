@@ -1048,91 +1048,87 @@ body::after {
 .farm-empty-title { font-family: var(--font-display); color: var(--farm-leaf-light); font-size: 15px; margin-bottom: 6px; }
 .farm-empty-desc { font-size: 12.5px; color: #c9e8c5; opacity: .8; }
 
-.farm-plantbar {
-    background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.35));
-    border: 1px solid rgba(155,224,138,0.18);
-    border-radius: var(--radius-md);
-    padding: 12px;
-}
-.farm-plantbar-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-.farm-select-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(155,224,138,0.2);
-    border-radius: 8px;
-    padding: 0 10px;
-}
-.farm-select-icon { font-size: 16px; }
-.farm-select-wrap select {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: #e8f5e0;
-    padding: 9px 4px;
-    font-family: inherit;
-    font-size: 13px;
-}
-.farm-select-wrap select option { color: #1a1a1a; }
-.farm-qty-wrap {
-    display: flex;
-    align-items: center;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(155,224,138,0.2);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.farm-qty-btn {
-    background: rgba(155,224,138,0.15);
-    border: none;
-    color: #d9f0d0;
-    width: 30px;
-    height: 36px;
-    font-size: 16px;
-    cursor: pointer;
-}
-.farm-qty-wrap input {
-    width: 38px;
-    text-align: center;
-    background: transparent;
-    border: none;
-    color: #fff;
-    font-family: inherit;
-    font-size: 13px;
-}
-.btn-plant-main {
+.farm-harvest-all-fixed {
     width: 100%;
-    background: linear-gradient(135deg, var(--farm-leaf-dark), var(--farm-leaf));
-    color: #0c1f10;
-    border: none;
-    border-radius: 9px;
-    padding: 11px;
-    font-weight: 700;
-    font-size: 13.5px;
-    cursor: pointer;
-    margin-bottom: 8px;
-    letter-spacing: .3px;
+    margin-top: 4px;
 }
-.btn-plant-main:active { transform: scale(.98); }
 .farm-page .btn-harvest-all {
     width: 100%;
     background: linear-gradient(135deg, var(--farm-gold), #ffb347);
     color: #2a1c00;
     border: none;
     border-radius: 9px;
-    padding: 11px;
+    padding: 12px;
     font-weight: 700;
     font-size: 13.5px;
     cursor: pointer;
     margin-top: 0;
 }
 .farm-page .btn-harvest-all:active { transform: scale(.98); }
+
+.farm-tile-empty { cursor: pointer; transition: transform .15s, border-color .15s; }
+.farm-tile-empty:hover, .farm-tile-empty:active {
+    border-color: rgba(155,224,138,0.5);
+    transform: scale(0.97);
+}
+
+/* Seed picker modal */
+.farm-plant-card { max-width: 340px; }
+.farm-seed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    margin: 14px 0;
+}
+.farm-seed-card {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 10px 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.farm-seed-card:active { transform: scale(.96); }
+.farm-seed-card-active {
+    border-color: var(--farm-leaf, #5fb86b);
+    background: rgba(95,184,107,0.15);
+}
+.farm-seed-icon { font-size: 22px; margin-bottom: 2px; }
+.farm-seed-name { font-size: 10.5px; font-weight: 700; color: #eee; }
+.farm-seed-meta { font-size: 9px; color: #aaa; margin-top: 2px; }
+
+.farm-plant-qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.farm-plant-qty-label { font-size: 12px; color: #ccc; }
+.farm-plant-qty-row button {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+}
+.farm-plant-qty-row input {
+    width: 60px;
+    text-align: center;
+    padding: 7px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+}
 
 /* ════════════════════════════════════════
    INVENTORY PAGE — Equip / Unequip / Repair
@@ -2173,4 +2169,143 @@ body::after {
   letter-spacing:1px;
   margin-top:10px;
   animation:actGlow 1s ease infinite;
+}
+
+/* ════════════════════════════════════════
+   GACHA PAGE — Treasure Chamber
+   ════════════════════════════════════════ */
+.gacha-page {
+    background: radial-gradient(circle at 50% 0%, #2a1f3d, #110a1c 70%);
+    border-radius: var(--radius-lg);
+    padding-bottom: 24px;
+}
+.gacha-page .page-title { color: #ffd166; }
+.gacha-intro {
+    font-size: 12.5px;
+    color: #ddd0ee;
+    text-align: center;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid rgba(178,102,255,0.25);
+}
+.gacha-crate-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+.gacha-crate-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-md);
+    padding: 14px 10px;
+    text-align: center;
+}
+.gacha-crate-common    { border-color: rgba(187,187,187,0.4); }
+.gacha-crate-uncommon  { border-color: rgba(90,169,255,0.4); }
+.gacha-crate-epic      { border-color: rgba(178,102,255,0.45); }
+.gacha-crate-legendary { border-color: rgba(255,143,214,0.5); grid-column: span 2; }
+.gacha-crate-mythic    { border-color: rgba(255,209,102,0.55); grid-column: span 2; background: linear-gradient(180deg, rgba(255,209,102,0.12), rgba(255,255,255,0.02)); }
+.gacha-crate-icon { font-size: 30px; margin-bottom: 6px; }
+.gacha-crate-name { font-family: var(--font-display); font-size: 12.5px; color: #f0eaff; margin-bottom: 4px; }
+.gacha-crate-owned { font-size: 11px; color: #bbb; margin-bottom: 10px; }
+.btn-gacha-open {
+    width: 100%;
+    background: linear-gradient(135deg, #7a3ff2, #b266ff);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-gacha-open:disabled {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.35);
+    cursor: not-allowed;
+}
+.btn-gacha-open:active:not(:disabled) { transform: scale(.96); }
+
+/* Reveal overlay */
+.gacha-reveal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5,2,12,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    padding: 20px;
+}
+.gacha-reveal-panel {
+    width: 100%;
+    max-width: 380px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, rgba(42,31,61,0.95), rgba(17,10,28,0.97));
+    border: 1.5px solid rgba(178,102,255,0.4);
+    border-radius: var(--radius-lg);
+    padding: 24px 18px;
+    text-align: center;
+}
+.gacha-reveal-chest {
+    font-size: 60px;
+    animation: gachaShake 0.6s ease-in-out infinite;
+    margin-bottom: 16px;
+}
+@keyframes gachaShake {
+    0%, 100% { transform: rotate(-4deg) scale(1); }
+    50%      { transform: rotate(4deg) scale(1.08); }
+}
+.gacha-reveal-status {
+    font-size: 13.5px;
+    color: #e8d9ff;
+    font-family: var(--font-display);
+    letter-spacing: .3px;
+}
+.gacha-reveal-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: #ffd166;
+    margin-bottom: 14px;
+}
+.gacha-result-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+    text-align: left;
+}
+.gacha-roll-divider {
+    font-size: 11px;
+    color: #b266ff;
+    text-align: center;
+    margin: 6px 0 2px;
+    letter-spacing: .5px;
+}
+.gacha-result-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.05);
+    border-left: 3px solid var(--tier-color, #ccc);
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+.gacha-result-emoji { font-size: 15px; }
+.gacha-result-name { flex: 1; font-size: 12.5px; color: #f0eaff; }
+.gacha-result-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--tier-color, #ccc);
+    border: 1px solid var(--tier-color, #ccc);
+    border-radius: 5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+.gacha-result-total {
+    font-size: 11.5px;
+    color: #bbb;
+    text-align: center;
+    margin-bottom: 14px;
 }

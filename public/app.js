@@ -541,6 +541,7 @@ function logout() {
     $('battleSection').style.display   = 'none';
     $('farmSection').style.display      = 'none';
     $('invSection').style.display       = 'none';
+    $('gachaSection').style.display      = 'none';
     $('loginBtn').disabled = false;
     $('senderIdInput').value = '';
     setStatus('Masukkan ID WhatsApp untuk memulai...');
@@ -756,16 +757,6 @@ async function loadFarm() {
 
 function renderFarm(farm) {
     lastFarmData = farm;
-    const select = $('plantSelect');
-    if (select.options.length === 0) {
-        Object.entries(farm.plantTable).forEach(([key, p]) => {
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = `${cropIcon(key)} ${key.charAt(0).toUpperCase() + key.slice(1)} — ${Math.floor(p.time / 60000)}m`;
-            select.appendChild(opt);
-        });
-        updatePlantSelectIcon();
-    }
 
     const readyCount = farm.plots.reduce((acc, p) => acc + p.slots.filter(s => s.ready).length, 0);
     const growingCount = farm.plots.reduce((acc, p) => acc + p.slots.filter(s => !s.ready).length, 0);
@@ -785,9 +776,9 @@ function renderFarm(farm) {
         const slotsHtml = [0, 1, 2].map(idx => {
             const s = p.slots[idx];
             if (!s) {
-                return `<div class="farm-tile farm-tile-empty">
+                return `<div class="farm-tile farm-tile-empty" onclick="openFarmPlantModal()">
                     <div class="farm-tile-icon">➕</div>
-                    <div class="farm-tile-label">Kosong</div>
+                    <div class="farm-tile-label">Tanam</div>
                 </div>`;
             }
             const icon = cropIcon(s.type);
@@ -814,21 +805,85 @@ function renderFarm(farm) {
     $('farmPlotsView').innerHTML = html;
 }
 
-function updatePlantSelectIcon() {
-    const sel = $('plantSelect');
-    if (sel && sel.value) $('plantSelectIcon').textContent = cropIcon(sel.value);
+// ── SEED PICKER MODAL ──
+let farmSelectedSeed = null;
+
+function openFarmPlantModal() {
+    if (!lastFarmData) return;
+    farmSelectedSeed = null;
+    $('farmPlantQtyRow').style.display = 'none';
+    $('farmPlantConfirmBtn').disabled = true;
+    $('farmPlantQty').value = 1;
+
+    const owned = lastFarmData.ownedSeeds || {};
+    const keys = Object.keys(owned);
+
+    if (keys.length === 0) {
+        $('farmSeedGrid').innerHTML = `<div class="farm-empty-state" style="padding:24px 12px">
+            <div class="farm-empty-icon">🌱</div>
+            <div class="farm-empty-title">Belum Punya Benih</div>
+            <div class="farm-empty-desc">Beli benih dulu di Shop sebelum menanam.</div>
+        </div>`;
+    } else {
+        $('farmSeedGrid').innerHTML = keys.map(key => {
+            const plant = lastFarmData.plantTable[key];
+            const qty = owned[key];
+            const timeMin = Math.floor(plant.time / 60000);
+            return `<div class="farm-seed-card" id="farmSeedCard-${key}" onclick="selectFarmSeed('${key}')">
+                <div class="farm-seed-icon">${cropIcon(key)}</div>
+                <div class="farm-seed-name">${key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                <div class="farm-seed-meta">📦 ${qty} &nbsp;•&nbsp; ⏱️ ${timeMin}m</div>
+            </div>`;
+        }).join('');
+    }
+
+    $('farmPlantModal').style.display = '';
 }
 
-function stepPlantAmount(delta) {
-    const inp = $('plantAmount');
+function closeFarmPlantModal() {
+    $('farmPlantModal').style.display = 'none';
+}
+
+function selectFarmSeed(key) {
+    farmSelectedSeed = key;
+    document.querySelectorAll('.farm-seed-card').forEach(el => el.classList.remove('farm-seed-card-active'));
+    $(`farmSeedCard-${key}`)?.classList.add('farm-seed-card-active');
+
+    const maxQty = lastFarmData.ownedSeeds[key] || 1;
+    const qtyInput = $('farmPlantQty');
+    qtyInput.value = 1;
+    qtyInput.max = maxQty;
+    $('farmPlantQtyLabel').textContent = `Jumlah (maks ${maxQty}):`;
+    $('farmPlantQtyRow').style.display = 'flex';
+    $('farmPlantConfirmBtn').disabled = false;
+}
+
+function adjustFarmPlantQty(delta) {
+    const inp = $('farmPlantQty');
     let v = (parseInt(inp.value) || 1) + delta;
+    const max = parseInt(inp.max) || 999;
     if (v < 1) v = 1;
+    if (v > max) v = max;
     inp.value = v;
 }
 
-async function doPlant() {
-    const plantType = $('plantSelect').value;
-    const amount = parseInt($('plantAmount').value) || 1;
+function clampFarmPlantQty() {
+    const inp = $('farmPlantQty');
+    let v = parseInt(inp.value) || 1;
+    const max = parseInt(inp.max) || 999;
+    if (v < 1) v = 1;
+    if (v > max) v = max;
+    inp.value = v;
+}
+
+async function confirmFarmPlant() {
+    if (!farmSelectedSeed) return;
+    const amount = parseInt($('farmPlantQty').value) || 1;
+    await doPlant(farmSelectedSeed, amount);
+    closeFarmPlantModal();
+}
+
+async function doPlant(plantType, amount) {
     try {
         const res = await fetch('/api/farm', {
             method: 'POST',
@@ -1821,6 +1876,155 @@ async function refreshCharacterStats() {
             updateCharStats(data.user);
         }
     } catch (e) { /* abaikan, tidak kritikal */ }
+}
+
+// ════════════════════════════════════════
+//  GACHA (Treasure Chamber)
+// ════════════════════════════════════════
+const TIER_COLOR = { common: '#bbbbbb', uncommon: '#5aa9ff', rare: '#5aa9ff', epic: '#b266ff', legendary: '#ff8fd6', mythic: '#ffd166' };
+const TIER_EMOJI_FE = { common: '⚪', uncommon: '🔵', rare: '🔵', epic: '🟣', legendary: '🌈', mythic: '⚡' };
+
+let gachaCrates = null;
+let gachaSelectedType = null;
+
+async function showGachaPage() {
+    if (!currentUser) return;
+    $('gachaSection').style.display = '';
+    $('dashboardSection').style.display = 'none';
+    $('gachaCrateGrid').innerHTML = '<p style="text-align:center;opacity:.5;padding:20px 0">Memuat peti...</p>';
+    await loadGachaCrates();
+}
+
+function hideGachaPage() {
+    $('gachaSection').style.display = 'none';
+    $('dashboardSection').style.display = '';
+}
+
+async function loadGachaCrates() {
+    try {
+        const res = await fetch(`/api/gacha?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (!data.ok) { $('gachaCrateGrid').innerHTML = `<div class="error-text">${data.error}</div>`; return; }
+        gachaCrates = data.crates;
+        renderGachaCrates();
+    } catch (e) {
+        $('gachaCrateGrid').innerHTML = `<div class="error-text">Gagal memuat data crate.</div>`;
+    }
+}
+
+function renderGachaCrates() {
+    $('gachaCrateGrid').innerHTML = gachaCrates.map(c => `
+        <div class="gacha-crate-card gacha-crate-${c.type}">
+            <div class="gacha-crate-icon">${TIER_EMOJI_FE[c.type] || '🎁'}</div>
+            <div class="gacha-crate-name">${c.label}</div>
+            <div class="gacha-crate-owned">🔑 Punya: <b>${fmt(c.owned)}</b></div>
+            <button class="btn-gacha-open" ${c.owned <= 0 ? 'disabled' : ''} onclick="openGachaQtyModal('${c.type}')">
+                ${c.owned <= 0 ? '🔒 Tidak Ada Kunci' : '⚜️ Buka Peti'}
+            </button>
+        </div>
+    `).join('');
+}
+
+function openGachaQtyModal(type) {
+    gachaSelectedType = type;
+    const c = gachaCrates.find(x => x.type === type);
+    if (!c) return;
+    $('gachaQtyTitle').textContent = `${TIER_EMOJI_FE[type] || '🎁'} ${c.label}`;
+    $('gachaQtyOwned').textContent = `Punya: ${fmt(c.owned)} kunci`;
+    const qtyInput = $('gachaQty');
+    qtyInput.value = 1;
+    qtyInput.max = Math.min(10, c.owned);
+    $('gachaQtyModal').style.display = '';
+}
+
+function closeGachaQtyModal() {
+    $('gachaQtyModal').style.display = 'none';
+}
+
+function adjustGachaQty(delta) {
+    const inp = $('gachaQty');
+    let v = (parseInt(inp.value) || 1) + delta;
+    const max = parseInt(inp.max) || 10;
+    if (v < 1) v = 1;
+    if (v > max) v = max;
+    inp.value = v;
+}
+
+function clampGachaQty() {
+    const inp = $('gachaQty');
+    let v = parseInt(inp.value) || 1;
+    const max = parseInt(inp.max) || 10;
+    if (v < 1) v = 1;
+    if (v > max) v = max;
+    inp.value = v;
+}
+
+async function confirmGachaOpen() {
+    const type = gachaSelectedType;
+    const amount = parseInt($('gachaQty').value) || 1;
+    closeGachaQtyModal();
+
+    // ── Reveal overlay: tahap segel terbuka (mirip animasi bot WA) ──
+    $('gachaRevealResults').style.display = 'none';
+    $('gachaRevealStage').style.display = '';
+    $('gachaRevealStatus').textContent = `⚜️ Menyelaraskan ${amount}x ${type.toUpperCase()} KEY dengan segel purba...`;
+    $('gachaRevealOverlay').style.display = '';
+
+    setTimeout(() => { $('gachaRevealStatus').textContent = '🔮 Rune mulai berpendar...'; }, 1000);
+    setTimeout(() => { $('gachaRevealStatus').textContent = '💥 Segel terbuka! Energi keluar...'; }, 2000);
+
+    try {
+        const res = await fetch('/api/gacha', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), type, amount }),
+        });
+        const data = await res.json();
+
+        await new Promise(r => setTimeout(r, 3000));
+
+        if (!data.ok) {
+            closeGachaReveal();
+            showLifeLog(`❌ ${data.error}`);
+            return;
+        }
+
+        renderGachaResults(data);
+        await loadGachaCrates();
+        await refreshCharacterStats();
+    } catch (e) {
+        closeGachaReveal();
+        showLifeLog('❌ Gagal terhubung ke server.');
+    }
+}
+
+function renderGachaResults(data) {
+    $('gachaRevealStage').style.display = 'none';
+    $('gachaResultTitle').textContent = data.jackpot ? '🌟 JACKPOT LUAR BIASA! 🌟' : `💠 ${data.type.toUpperCase()} TREASURE 💠`;
+
+    let html = '';
+    data.rolls.forEach((roll, i) => {
+        if (data.rolls.length > 1) html += `<div class="gacha-roll-divider">Peti #${i + 1}${roll.jackpot ? ' ✨' : ''}</div>`;
+        roll.loot.forEach(item => {
+            const color = TIER_COLOR[item.tier] || '#ccc';
+            const emoji = TIER_EMOJI_FE[item.tier] || '⚪';
+            const badge = item.special ? 'SPECIAL' : item.bonus ? 'BONUS' : item.tier.toUpperCase();
+            html += `<div class="gacha-result-row" style="--tier-color:${color}">
+                <span class="gacha-result-emoji">${emoji}</span>
+                <span class="gacha-result-name">${item.name}</span>
+                <span class="gacha-result-badge">${badge}</span>
+            </div>`;
+        });
+    });
+    html += `<div class="gacha-result-total">📦 Total ${data.totalAllItems} item masuk ke inventory.</div>`;
+    $('gachaResultList').innerHTML = html;
+    $('gachaRevealResults').style.display = '';
+
+    showLifeLog(`⚜️ Buka ${data.amount}x ${data.type.toUpperCase()} CRATE → ${data.totalAllItems} item didapat${data.jackpot ? ' 🌟 JACKPOT!' : ''}`);
+}
+
+function closeGachaReveal() {
+    $('gachaRevealOverlay').style.display = 'none';
 }
 
 // ─── AUTO-LOGIN (from localStorage) ───

@@ -150,6 +150,7 @@
       <button class="btn-action" onclick="showStatsPage()">📊 Profil Lengkap</button>
       <button class="btn-action" onclick="showInventoryPage()">🎒 Inventory</button>
       <button class="btn-action" onclick="showShopPage()">🛒 Shop</button>
+      <button class="btn-action" onclick="showGachaPage()">⚜️ Gacha</button>
       <button class="btn-action" onclick="showSellPage()">💰 Jual Item</button>
     </div>
 
@@ -182,20 +183,24 @@
 
     <div id="farmPlotsView" class="farm-grid"></div>
 
-    <div class="farm-plantbar glass-card">
-      <div class="farm-plantbar-row">
-        <div class="farm-select-wrap">
-          <span class="farm-select-icon" id="plantSelectIcon">🌱</span>
-          <select id="plantSelect" onchange="updatePlantSelectIcon()"></select>
-        </div>
-        <div class="farm-qty-wrap">
-          <button class="farm-qty-btn" onclick="stepPlantAmount(-1)">−</button>
-          <input id="plantAmount" type="number" min="1" value="1">
-          <button class="farm-qty-btn" onclick="stepPlantAmount(1)">+</button>
-        </div>
+    <button class="btn-harvest-all farm-harvest-all-fixed" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
+  </div>
+
+  <!-- Farm: Seed Picker Modal (muncul saat klik tile kosong "+") -->
+  <div id="farmPlantModal" class="shop-buy-modal" style="display:none">
+    <div class="shop-buy-card glass-card farm-plant-card">
+      <div class="shop-buy-title">🌱 Pilih Benih untuk Ditanam</div>
+      <div id="farmSeedGrid" class="farm-seed-grid"></div>
+      <div class="farm-plant-qty-row" id="farmPlantQtyRow" style="display:none">
+        <span class="farm-plant-qty-label" id="farmPlantQtyLabel">Jumlah:</span>
+        <button onclick="adjustFarmPlantQty(-1)">−</button>
+        <input id="farmPlantQty" type="number" min="1" value="1" oninput="clampFarmPlantQty()">
+        <button onclick="adjustFarmPlantQty(1)">+</button>
       </div>
-      <button class="btn-plant-main" onclick="doPlant()">🌱 Tanam Sekarang</button>
-      <button class="btn-harvest-all" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
+      <div class="shop-buy-actions">
+        <button class="btn-small" onclick="closeFarmPlantModal()">Batal</button>
+        <button class="btn-small btn-confirm-buy" id="farmPlantConfirmBtn" onclick="confirmFarmPlant()" disabled>🌱 Tanam</button>
+      </div>
     </div>
   </div>
 
@@ -215,6 +220,52 @@
 
     <div id="invGearsView"></div>
     <div id="invItemsView" style="display:none"></div>
+  </div>
+
+  <!-- ═══ GACHA SECTION (Treasure Chamber) ═══ -->
+  <div id="gachaSection" style="display:none" class="section-page gacha-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideGachaPage()">← Kembali</button>
+      <div class="page-title">⚜️ Treasure Chamber</div>
+    </div>
+
+    <div class="gacha-intro glass-card">
+      ⚜️ Kalahkan Boss atau kunjungi Shop untuk mendapatkan kunci, lalu buka peti di sini untuk loot acak!
+    </div>
+
+    <div id="gachaCrateGrid" class="gacha-crate-grid"></div>
+  </div>
+
+  <!-- Gacha: Qty Picker Modal -->
+  <div id="gachaQtyModal" class="shop-buy-modal" style="display:none">
+    <div class="shop-buy-card glass-card">
+      <div class="shop-buy-title" id="gachaQtyTitle">Buka Crate</div>
+      <div class="shop-buy-price" id="gachaQtyOwned">Punya: -</div>
+      <div class="shop-buy-qty-row">
+        <button onclick="adjustGachaQty(-1)">−</button>
+        <input id="gachaQty" type="number" min="1" value="1" oninput="clampGachaQty()">
+        <button onclick="adjustGachaQty(1)">+</button>
+      </div>
+      <div class="shop-buy-actions">
+        <button class="btn-small" onclick="closeGachaQtyModal()">Batal</button>
+        <button class="btn-small btn-confirm-buy" onclick="confirmGachaOpen()">⚜️ Buka Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gacha: Reveal Overlay -->
+  <div id="gachaRevealOverlay" class="gacha-reveal-overlay" style="display:none">
+    <div class="gacha-reveal-panel">
+      <div id="gachaRevealStage" class="gacha-reveal-stage">
+        <div class="gacha-reveal-chest">⚜️</div>
+        <div class="gacha-reveal-status" id="gachaRevealStatus">Menyelaraskan kunci dengan segel purba...</div>
+      </div>
+      <div id="gachaRevealResults" class="gacha-reveal-results" style="display:none">
+        <div class="gacha-reveal-title" id="gachaResultTitle">💠 LOOT 💠</div>
+        <div id="gachaResultList" class="gacha-result-list"></div>
+        <button class="btn-small btn-confirm-buy" onclick="closeGachaReveal()">✅ Selesai</button>
+      </div>
+    </div>
   </div>
 
 
