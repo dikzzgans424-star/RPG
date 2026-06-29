@@ -71,10 +71,6 @@ function showDashboard(data) {
     $('dashboardSection').style.display = '';
     $('battleSection').style.display   = 'none';
 
-    // Safety net: tombol mode battle harus selalu enabled saat di lobby,
-    // kalau tidak ada battle aktif lain yang sedang di-resume.
-    document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
-
     const u = data.user;
     const ri = data.roleInfo || {};
 
@@ -127,8 +123,9 @@ async function startBattle(mode) {
     isProcessing = true;
     setStatus(`Memulai ${mode} battle...`, 'active');
 
-    // Disable all mode buttons
-    document.querySelectorAll('.mode-btn').forEach(b => b.disabled = true);
+    // Disable tombol mode BATTLE saja (bukan life-skill) sesaat selagi request
+    // jalan, sekedar mencegah double-click — bukan representasi cooldown asli.
+    document.querySelectorAll('.mode-btn:not(.lifeskill-btn)').forEach(b => b.disabled = true);
 
     try {
         const senderId = currentUser.senderId;
@@ -140,7 +137,15 @@ async function startBattle(mode) {
         const data = await res.json();
         if (!data.ok) {
             setStatus('❌ ' + data.error, 'error');
-            document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+            if (data.cooldownLeft) {
+                // Masih cooldown — lock ulang tombol ini dengan sisa waktu yang
+                // benar, JANGAN dibuka kembali.
+                startBattleModeCooldown(mode, data.cooldownLeft);
+                // Tombol mode battle lain yang tidak cooldown tetap perlu dibuka.
+                syncBattleModeCooldowns(currentUser);
+            } else {
+                syncBattleModeCooldowns(currentUser);
+            }
             isProcessing = false;
             return;
         }
@@ -148,11 +153,11 @@ async function startBattle(mode) {
         currentBattle = data.battle;
         currentMode   = mode;
         showBattle();
-        document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+        syncBattleModeCooldowns(currentUser);
         isProcessing = false;
     } catch (e) {
         setStatus('Gagal memulai battle', 'error');
-        document.querySelectorAll('.mode-btn').forEach(b => b.disabled = false);
+        syncBattleModeCooldowns(currentUser);
         isProcessing = false;
     }
 }
@@ -374,7 +379,7 @@ async function doAction(action, skillName = null) {
         // Handle result
         switch (data.turnResult) {
             case 'win':
-                showResult('win', data.reward);
+                showResult('win', data.reward, { isBoss: data.isBoss });
                 break;
             case 'lose':
                 showResult('lose', null);
@@ -432,9 +437,9 @@ function enableActions(enabled) {
 }
 
 // ─── SHOW RESULT ───
-function showResult(type, reward) {
+function showResult(type, reward, opts = {}) {
     enableActions(false);
-    $('backBtn').style.display = '';
+    $('backBtn').style.display = 'none'; // tombol lama disembunyikan, diganti tombol di modal
 
     const isWin = type === 'win' || type === 'horde_complete';
 
@@ -460,16 +465,44 @@ function showResult(type, reward) {
         }
     }
 
+    // Dungeon menang & bukan boss floor -> tawarkan lanjut ke floor berikutnya.
+    // Boss floor (atau mode lain) -> cuma tombol kembali ke dashboard.
+    const showNextFloor = type === 'win' && currentMode === 'dungeon' && !opts.isBoss;
+    const actionsHTML = showNextFloor
+        ? `<div class="result-actions">
+             <button class="btn-result-secondary" onclick="closeResultModal()">🏠 Dashboard</button>
+             <button class="btn-result-primary" onclick="nextDungeonFloor()">⬇️ Next Floor</button>
+           </div>`
+        : `<div class="result-actions">
+             <button class="btn-result-primary" onclick="closeResultModal()" style="flex:1">🏠 Kembali ke Dashboard</button>
+           </div>`;
+
+    document.getElementById('resultOverlay')?.remove();
     const overlay = document.createElement('div');
+    overlay.id = 'resultOverlay';
     overlay.className = `result-overlay ${isWin ? 'result-win' : 'result-lose'}`;
     overlay.innerHTML = `
-        <div class="result-title">${titleText}</div>
-        ${rewardHTML}
+        <div class="result-card">
+            <div class="result-title">${titleText}</div>
+            ${rewardHTML}
+            ${actionsHTML}
+        </div>
     `;
-    $('battleSection').insertBefore(overlay, $('backBtn'));
+    document.body.appendChild(overlay);
 
     currentBattle = null;
     setStatus(isWin ? 'Kamu menang! 🏆' : (type === 'flee' ? 'Berhasil kabur!' : 'Kamu kalah...'), isWin ? 'active' : 'warn');
+}
+
+function closeResultModal() {
+    document.getElementById('resultOverlay')?.remove();
+    endBattle();
+}
+
+// Lanjut langsung ke floor dungeon berikutnya tanpa balik ke dashboard dulu.
+async function nextDungeonFloor() {
+    document.getElementById('resultOverlay')?.remove();
+    await startBattle('dungeon');
 }
 
 // ─── END BATTLE / BACK ───
@@ -501,10 +534,13 @@ function logout() {
     currentBattle  = null;
     currentMode    = null;
     unlockedSkills = [];
+    if (farmRefreshTimer) { clearInterval(farmRefreshTimer); farmRefreshTimer = null; }
     localStorage.removeItem('rpg_sender_id');
     $('loginSection').style.display    = '';
     $('dashboardSection').style.display = 'none';
     $('battleSection').style.display   = 'none';
+    $('farmSection').style.display      = 'none';
+    $('invSection').style.display       = 'none';
     $('loginBtn').disabled = false;
     $('senderIdInput').value = '';
     setStatus('Masukkan ID WhatsApp untuk memulai...');
@@ -681,11 +717,29 @@ function showLifeLog(html) {
 // ════════════════════════════════════════
 //  FARMING
 // ════════════════════════════════════════
-function toggleFarmPanel() {
-    const panel = $('farmPanel');
-    const willShow = panel.style.display === 'none';
-    panel.style.display = willShow ? '' : 'none';
-    if (willShow) loadFarm();
+const CROP_ICONS = {
+    wheat: '🌾', carrot: '🥕', potato: '🥔', corn: '🌽', tomato: '🍅',
+    pumpkin: '🎃', melon: '🍈', beetroot: '🟣', cocoa: '🍫', coconut: '🥥',
+};
+function cropIcon(type) { return CROP_ICONS[type] || '🌱'; }
+
+let farmRefreshTimer = null;
+let lastFarmData = null;
+
+async function showFarmPage() {
+    if (!currentUser) return;
+    $('farmSection').style.display = '';
+    $('dashboardSection').style.display = 'none';
+    $('farmPlotsView').innerHTML = '<p style="text-align:center;opacity:.5;padding:20px 0">Memuat lahan...</p>';
+    await loadFarm();
+    if (farmRefreshTimer) clearInterval(farmRefreshTimer);
+    farmRefreshTimer = setInterval(loadFarm, 5000);
+}
+
+function hideFarmPage() {
+    $('farmSection').style.display = 'none';
+    $('dashboardSection').style.display = '';
+    if (farmRefreshTimer) { clearInterval(farmRefreshTimer); farmRefreshTimer = null; }
 }
 
 async function loadFarm() {
@@ -701,37 +755,75 @@ async function loadFarm() {
 }
 
 function renderFarm(farm) {
+    lastFarmData = farm;
     const select = $('plantSelect');
     if (select.options.length === 0) {
         Object.entries(farm.plantTable).forEach(([key, p]) => {
             const opt = document.createElement('option');
             opt.value = key;
-            opt.textContent = `${key} (${Math.floor(p.time / 60000)}m)`;
+            opt.textContent = `${cropIcon(key)} ${key.charAt(0).toUpperCase() + key.slice(1)} — ${Math.floor(p.time / 60000)}m`;
             select.appendChild(opt);
         });
+        updatePlantSelectIcon();
     }
 
+    const readyCount = farm.plots.reduce((acc, p) => acc + p.slots.filter(s => s.ready).length, 0);
+    const growingCount = farm.plots.reduce((acc, p) => acc + p.slots.filter(s => !s.ready).length, 0);
+    $('farmBannerSub').innerHTML = `🏡 ${farm.farmPlots} Lahan &nbsp;•&nbsp; 🌱 ${growingCount} Tumbuh &nbsp;•&nbsp; ✅ ${readyCount} Siap Panen${farm.hasSpouse ? ' &nbsp;•&nbsp; 💍 Bonus Pasangan Aktif' : ''}`;
+
     if (farm.farmPlots === 0) {
-        $('farmPlotsView').innerHTML = `<div class="error-text">Belum punya lahan. Beli di shop bot WA dulu.</div>`;
+        $('farmPlotsView').innerHTML = `<div class="farm-empty-state">
+            <div class="farm-empty-icon">🏞️</div>
+            <div class="farm-empty-title">Belum Punya Lahan</div>
+            <div class="farm-empty-desc">Beli lahan di shop bot WhatsApp untuk mulai bertani.</div>
+        </div>`;
         return;
     }
 
     let html = '';
     farm.plots.forEach(p => {
-        html += `<div class="farm-plot"><b>Lahan ${p.plot}</b>`;
-        if (p.slots.length === 0) html += `<div class="farm-slot-empty">📭 Siap ditanami</div>`;
-        p.slots.forEach(s => {
-            html += `<div class="farm-slot">
-                <span>${s.type.toUpperCase()} x${s.amount}</span>
-                <div class="farm-progress"><div class="farm-progress-fill" style="width:${s.progress}%"></div></div>
+        const slotsHtml = [0, 1, 2].map(idx => {
+            const s = p.slots[idx];
+            if (!s) {
+                return `<div class="farm-tile farm-tile-empty">
+                    <div class="farm-tile-icon">➕</div>
+                    <div class="farm-tile-label">Kosong</div>
+                </div>`;
+            }
+            const icon = cropIcon(s.type);
+            const stageClass = s.ready ? 'farm-tile-ready' : (s.progress >= 50 ? 'farm-tile-growing' : 'farm-tile-sprout');
+            const growIcon = s.ready ? icon : (s.progress >= 50 ? '🌿' : '🌱');
+            return `<div class="farm-tile ${stageClass}">
+                ${s.ready ? '<div class="farm-glow"></div>' : ''}
+                <div class="farm-tile-icon">${growIcon}</div>
+                <div class="farm-tile-name">${s.type.toUpperCase()} ×${s.amount}</div>
+                <div class="farm-tile-progress">
+                    <div class="farm-tile-progress-fill" id="farmFill-${p.plot}-${s.slot}" style="width:${s.progress}%"></div>
+                </div>
                 ${s.ready
-                    ? `<button class="btn-small" onclick="doHarvest(${p.plot},${s.slot})">🧺 Panen</button>`
-                    : `<span class="farm-pct">${s.progress}%</span>`}
+                    ? `<button class="farm-tile-harvest" onclick="doHarvest(${p.plot},${s.slot})">🧺 Panen</button>`
+                    : `<div class="farm-tile-pct" id="farmPct-${p.plot}-${s.slot}">${s.progress}%</div>`}
             </div>`;
-        });
-        html += `</div>`;
+        }).join('');
+
+        html += `<div class="farm-plot-card">
+            <div class="farm-plot-label"><span class="farm-plot-tag">Lahan ${p.plot}</span></div>
+            <div class="farm-plot-tiles">${slotsHtml}</div>
+        </div>`;
     });
     $('farmPlotsView').innerHTML = html;
+}
+
+function updatePlantSelectIcon() {
+    const sel = $('plantSelect');
+    if (sel && sel.value) $('plantSelectIcon').textContent = cropIcon(sel.value);
+}
+
+function stepPlantAmount(delta) {
+    const inp = $('plantAmount');
+    let v = (parseInt(inp.value) || 1) + delta;
+    if (v < 1) v = 1;
+    inp.value = v;
 }
 
 async function doPlant() {
@@ -1400,10 +1492,67 @@ async function doSellSelected() {
 
 // ─── Sync semua cooldown baru saat load dashboard ───
 function syncAllCooldowns(user) {
+    syncBattleModeCooldowns(user);
     syncGatherCooldowns(user);
     syncExploreCooldown(user);
     syncAdvCooldown(user);
     syncHuntAnimalCooldown(user);
+}
+
+// ════════════════════════════════════════
+//  BATTLE MODE COOLDOWNS (Hunt/Dungeon/Beast/Horde)
+// ════════════════════════════════════════
+// Nilai & field disalin PERSIS dari battle-start.js/battle-action.js (yang juga
+// disalin dari bot WA), supaya lock di UI selalu sinkron dengan validasi server.
+const BATTLE_MODE_INFO = {
+    hunt:    { btn: 'btnHunt',    cd: 'cdHunt',    field: 'lastHunt',    cdMs: 90000,  idle: 'Berburu monster acak. Cepat & sering.' },
+    dungeon: { btn: 'btnDungeon', cd: 'cdDungeon', field: 'lastDungeon', cdMs: 180000, idle: 'Floor demi floor. Boss setiap 10F.' },
+    beast:   { btn: 'btnBeast',   cd: 'cdBeast',   field: 'lastBoss',    cdMs: 300000, idle: 'Boss 3 fase. Reward terbesar.' },
+    horde:   { btn: 'btnHorde',   cd: 'cdHorde',   field: 'lastHorde',   cdMs: 600000, idle: '10 gelombang monster berturut.' },
+};
+const battleModeTimers = {};
+
+function syncBattleModeCooldowns(user) {
+    const now = Date.now();
+    Object.entries(BATTLE_MODE_INFO).forEach(([mode, info]) => {
+        const last = user[info.field] || 0;
+        const elapsed = now - last;
+        if (last && elapsed < info.cdMs) {
+            startBattleModeCooldown(mode, Math.ceil((info.cdMs - elapsed) / 1000));
+        } else {
+            const btn = $(info.btn);
+            const label = $(info.cd);
+            if (btn) btn.disabled = false;
+            if (label) label.textContent = info.idle;
+        }
+    });
+}
+
+function startBattleModeCooldown(mode, seconds) {
+    const info = BATTLE_MODE_INFO[mode];
+    const btn = $(info.btn);
+    const label = $(info.cd);
+    if (!btn || !label) return;
+    btn.disabled = true;
+    let left = seconds;
+
+    if (battleModeTimers[mode]) clearInterval(battleModeTimers[mode]);
+    const render = () => {
+        const m = Math.floor(left / 60);
+        const s = left % 60;
+        label.textContent = `⏳ ${m > 0 ? `${m}m ${s}s` : `${s}s`}`;
+    };
+    render();
+    battleModeTimers[mode] = setInterval(() => {
+        left--;
+        if (left <= 0) {
+            clearInterval(battleModeTimers[mode]);
+            btn.disabled = false;
+            label.textContent = info.idle;
+        } else {
+            render();
+        }
+    }, 1000);
 }
 
 // ════════════════════════════════════════
@@ -1521,6 +1670,157 @@ async function confirmBuy() {
         await loadShopItems(); // refresh limit harian & owned count
         showLifeLog(`🛒 Berhasil beli <b>${qty}x ${data.bought.name}</b> — -${fmt(data.totalGold)} 🪙`);
     } catch { alert('❌ Gagal terhubung ke server.'); }
+}
+
+// ════════════════════════════════════════
+//  INVENTORY (Equip / Unequip / Repair)
+// ════════════════════════════════════════
+let invData = null;
+let invTab = 'gears';
+
+async function showInventoryPage() {
+    if (!currentUser) return;
+    $('invSection').style.display = '';
+    $('dashboardSection').style.display = 'none';
+    invTab = 'gears';
+    switchInvTab('gears');
+    $('invGearsView').innerHTML = '<p style="text-align:center;opacity:.5;padding:20px 0">Memuat inventory...</p>';
+    await loadInventory();
+}
+
+function hideInventoryPage() {
+    $('invSection').style.display = 'none';
+    $('dashboardSection').style.display = '';
+}
+
+function switchInvTab(tab) {
+    invTab = tab;
+    $('invTabGears').classList.toggle('active', tab === 'gears');
+    $('invTabItems').classList.toggle('active', tab === 'items');
+    $('invGearsView').style.display = tab === 'gears' ? '' : 'none';
+    $('invItemsView').style.display = tab === 'items' ? '' : 'none';
+}
+
+async function loadInventory() {
+    try {
+        const res = await fetch(`/api/equipment?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (!data.ok) { $('invGearsView').innerHTML = `<div class="error-text">${data.error}</div>`; return; }
+        invData = data;
+        renderInventory();
+    } catch (e) {
+        $('invGearsView').innerHTML = `<div class="error-text">Gagal memuat inventory.</div>`;
+    }
+}
+
+function renderInventory() {
+    if (!invData) return;
+    $('invGold').textContent = fmt(invData.gold);
+
+    // ── GEARS TAB ──
+    if (invData.gears.length === 0) {
+        $('invGearsView').innerHTML = '<div class="error-text" style="text-align:center;padding:20px 0">🗃️ Gudang perlengkapan kosong.</div>';
+    } else {
+        $('invGearsView').innerHTML = invData.gears.map(g => {
+            const duraClass = g.durabilityPct <= 0 ? 'dura-broken' : (g.durabilityPct <= 30 ? 'dura-low' : '');
+            const equippedBadge = g.equipped ? '<span class="gear-badge-active">✅ DIPAKAI</span>' : '';
+            const needsRepair = g.durability < g.maxDurability;
+            return `<div class="gear-card glass-card ${g.equipped ? 'gear-card-active' : ''}">
+                <div class="gear-card-top">
+                    <div class="gear-icon">${g.icon}</div>
+                    <div class="gear-info">
+                        <div class="gear-name">${g.label}</div>
+                        <div class="gear-stat">${g.icon} +${fmt(g.bonusStat)} ${g.statLabel} &nbsp;•&nbsp; Slot: ${g.type.toUpperCase()}</div>
+                    </div>
+                    ${equippedBadge}
+                </div>
+                <div class="gear-dura-row">
+                    <div class="gear-dura-bar-wrap"><div class="gear-dura-bar ${duraClass}" style="width:${g.durabilityPct}%"></div></div>
+                    <span class="gear-dura-text ${duraClass}">${fmt(g.durability)}/${fmt(g.maxDurability)}</span>
+                </div>
+                <div class="gear-actions">
+                    ${g.equipped
+                        ? `<button class="btn-gear btn-unequip" onclick="doUnequip('${g.type}')">📤 Unequip</button>`
+                        : `<button class="btn-gear btn-equip" onclick="doEquip(${g.idx})">⚔️ Equip</button>`}
+                    ${needsRepair ? `<button class="btn-gear btn-repair" onclick="doRepair(${g.idx})">🔨 Repair</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── ITEMS TAB ──
+    if (invData.inventory.length === 0) {
+        $('invItemsView').innerHTML = '<div class="error-text" style="text-align:center;padding:20px 0">📦 Tas item kosong.</div>';
+    } else {
+        $('invItemsView').innerHTML = `<div class="glass-card">` + invData.inventory.map(it => `
+            <div class="inv-item-row">
+                <span>${it.name}</span>
+                <span class="inv-item-qty">×${fmt(it.qty)}</span>
+            </div>`).join('') + `</div>`;
+    }
+}
+
+async function doEquip(idx, force) {
+    try {
+        const res = await fetch('/api/equipment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'equip', idx, force: !!force }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+            if (data.needForce && confirm(`${data.error}\n\nPaksa pakai item rusak ini? (Tidak ada bonus stat)`)) {
+                return doEquip(idx, true);
+            }
+            alert(data.error);
+            return;
+        }
+        invData = data;
+        renderInventory();
+        await refreshCharacterStats();
+    } catch (e) { alert('❌ Gagal equip item.'); }
+}
+
+async function doUnequip(slot) {
+    try {
+        const res = await fetch('/api/equipment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'unequip', slot }),
+        });
+        const data = await res.json();
+        if (!data.ok) { alert(data.error); return; }
+        invData = data;
+        renderInventory();
+        await refreshCharacterStats();
+    } catch (e) { alert('❌ Gagal unequip item.'); }
+}
+
+async function doRepair(idx) {
+    try {
+        const res = await fetch('/api/equipment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: senderId(), action: 'repair', idx }),
+        });
+        const data = await res.json();
+        if (!data.ok) { alert(data.error); return; }
+        invData = data;
+        renderInventory();
+        alert(data.message);
+    } catch (e) { alert('❌ Gagal repair item.'); }
+}
+
+// Refresh char-card stats (gold/atk/def etc) tanpa reload halaman penuh
+async function refreshCharacterStats() {
+    try {
+        const res = await fetch(`/api/character?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (data.ok) {
+            currentUser = { ...currentUser, ...data.user };
+            updateCharStats(data.user);
+        }
+    } catch (e) { /* abaikan, tidak kritikal */ }
 }
 
 // ─── AUTO-LOGIN (from localStorage) ───

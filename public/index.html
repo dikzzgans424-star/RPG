@@ -79,25 +79,25 @@
     <div id="modeSection">
       <div class="section-title">⚔️ Pilih Mode Battle</div>
       <div class="mode-grid">
-        <button class="mode-btn" onclick="startBattle('hunt')">
+        <button class="mode-btn" id="btnHunt" onclick="startBattle('hunt')" disabled>
           <div class="mode-icon">🗡️</div>
           <div class="mode-name">Hunt</div>
-          <div class="mode-desc">Berburu monster acak. Cepat & sering.</div>
+          <div class="mode-desc" id="cdHunt">Memuat...</div>
         </button>
-        <button class="mode-btn" onclick="startBattle('dungeon')">
+        <button class="mode-btn" id="btnDungeon" onclick="startBattle('dungeon')" disabled>
           <div class="mode-icon">🏰</div>
           <div class="mode-name">Dungeon</div>
-          <div class="mode-desc">Floor demi floor. Boss setiap 10F.</div>
+          <div class="mode-desc" id="cdDungeon">Memuat...</div>
         </button>
-        <button class="mode-btn" onclick="startBattle('beast')">
+        <button class="mode-btn" id="btnBeast" onclick="startBattle('beast')" disabled>
           <div class="mode-icon">🐉</div>
           <div class="mode-name">Ancient Beast</div>
-          <div class="mode-desc">Boss 3 fase. Reward terbesar.</div>
+          <div class="mode-desc" id="cdBeast">Memuat...</div>
         </button>
-        <button class="mode-btn" onclick="startBattle('horde')">
+        <button class="mode-btn" id="btnHorde" onclick="startBattle('horde')" disabled>
           <div class="mode-icon">👹</div>
           <div class="mode-name">Horde Invasion</div>
-          <div class="mode-desc">10 gelombang monster berturut.</div>
+          <div class="mode-desc" id="cdHorde">Memuat...</div>
         </button>
       </div>
     </div>
@@ -121,7 +121,7 @@
           <div class="mode-name">Fishing</div>
           <div class="mode-desc" id="cdFish">Memuat...</div>
         </button>
-        <button class="mode-btn lifeskill-btn" id="btnFarm" onclick="toggleFarmPanel()">
+        <button class="mode-btn lifeskill-btn" id="btnFarm" onclick="showFarmPage()">
           <div class="mode-icon">🌾</div>
           <div class="mode-name">Farming</div>
           <div class="mode-desc">Tanam & Panen</div>
@@ -148,20 +148,9 @@
     <!-- Quick Actions -->
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn-action" onclick="showStatsPage()">📊 Profil Lengkap</button>
+      <button class="btn-action" onclick="showInventoryPage()">🎒 Inventory</button>
       <button class="btn-action" onclick="showShopPage()">🛒 Shop</button>
       <button class="btn-action" onclick="showSellPage()">💰 Jual Item</button>
-    </div>
-
-    <!-- Farm Panel -->
-    <div class="glass-card" id="farmPanel" style="display:none">
-      <div class="section-title">🌾 Lahan Pertanian</div>
-      <div id="farmPlotsView"></div>
-      <div class="farm-plant-row">
-        <select id="plantSelect"></select>
-        <input id="plantAmount" type="number" min="1" value="1" style="width:60px">
-        <button class="btn-small" onclick="doPlant()">🌱 Tanam</button>
-      </div>
-      <button class="btn-small btn-harvest-all" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
     </div>
 
   </div>
@@ -174,6 +163,60 @@
     </div>
     <div id="statsContent" class="glass-card"></div>
   </div>
+
+  <!-- ═══ FARM SECTION (dedicated full page) ═══ -->
+  <div id="farmSection" style="display:none" class="section-page farm-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideFarmPage()">← Kembali</button>
+      <div class="page-title">🌾 Lahan Pertanian</div>
+    </div>
+
+    <div class="farm-banner">
+      <div class="farm-banner-icon">🚜</div>
+      <div class="farm-banner-info">
+        <div class="farm-banner-title">Miwa Farmstead</div>
+        <div class="farm-banner-sub" id="farmBannerSub">Memuat lahan...</div>
+      </div>
+      <div class="farm-banner-badge" id="farmHoeBadge">🌤️ Live</div>
+    </div>
+
+    <div id="farmPlotsView" class="farm-grid"></div>
+
+    <div class="farm-plantbar glass-card">
+      <div class="farm-plantbar-row">
+        <div class="farm-select-wrap">
+          <span class="farm-select-icon" id="plantSelectIcon">🌱</span>
+          <select id="plantSelect" onchange="updatePlantSelectIcon()"></select>
+        </div>
+        <div class="farm-qty-wrap">
+          <button class="farm-qty-btn" onclick="stepPlantAmount(-1)">−</button>
+          <input id="plantAmount" type="number" min="1" value="1">
+          <button class="farm-qty-btn" onclick="stepPlantAmount(1)">+</button>
+        </div>
+      </div>
+      <button class="btn-plant-main" onclick="doPlant()">🌱 Tanam Sekarang</button>
+      <button class="btn-harvest-all" onclick="doHarvestAll()">🧺 Panen Semua yang Siap</button>
+    </div>
+  </div>
+
+  <!-- ═══ INVENTORY SECTION ═══ -->
+  <div id="invSection" style="display:none" class="section-page">
+    <div class="page-header">
+      <button class="btn-back-page" onclick="hideInventoryPage()">← Kembali</button>
+      <div class="page-title">🎒 Inventory</div>
+    </div>
+
+    <div class="inv-gold-bar glass-card">💰 <span id="invGold">-</span> Gold</div>
+
+    <div class="inv-tabs">
+      <button class="inv-tab active" id="invTabGears" onclick="switchInvTab('gears')">⚔️ Gears</button>
+      <button class="inv-tab" id="invTabItems" onclick="switchInvTab('items')">📦 Items</button>
+    </div>
+
+    <div id="invGearsView"></div>
+    <div id="invItemsView" style="display:none"></div>
+  </div>
+
 
   <!-- ═══ SELL SECTION ═══ -->
   <div id="sellSection" style="display:none" class="section-page">
