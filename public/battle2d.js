@@ -45,12 +45,14 @@ const RT = (() => {
             x: 120, hp: user.hp, maxHp: user.maxHp, mana: user.mana, maxMana: user.maxMana,
             facing: 1, attackCdEnd: 0, dashCdEnd: 0, dashing: false, dashEndT: 0,
             invuln: 0, defending: false, hitFlash: 0, atkAnim: 0,
+            runPhase: 0, idleT: 0,
         };
         monster = {
             x: ARENA_W - 160, hp: battle.monsterHp, maxHp: battle.monsterMaxHp,
             atk: battle.monsterAtk, def: battle.monsterDef || 0,
             facing: -1, attackCdEnd: performance.now() + 900, windup: 0, hitFlash: 0,
             emoji: battle.monster?.emoji || '👹', name: battle.monster?.name || 'Monster',
+            idleT: 0, windupStartT: 0, hue: VectorChar.hueFromName(battle.monster?.name || 'Monster'),
         };
 
         keys = {};
@@ -320,6 +322,8 @@ const RT = (() => {
 
         if (player.atkAnim > 0) player.atkAnim = Math.max(0, player.atkAnim - dt * 4);
         if (player.hitFlash > 0) player.hitFlash = Math.max(0, player.hitFlash - dt * 3);
+        player.idleT += dt;
+        if (moveLeft || moveRight) player.runPhase += dt * (player.dashing ? 4 : 9);
 
         // Monster AI: chase + telegraphed attack
         const dist = Math.abs(monster.x - player.x);
@@ -338,6 +342,7 @@ const RT = (() => {
             }
         }
         if (monster.hitFlash > 0) monster.hitFlash = Math.max(0, monster.hitFlash - dt * 3);
+        monster.idleT = (monster.idleT || 0) + dt;
 
         // Status effect ticks (burn/poison/bleed)
         if (monster.ailment && monster.hp > 0 && ts >= monster.ailment.nextTickAt) {
@@ -449,13 +454,17 @@ const RT = (() => {
 
         // monster
         ctx.save();
-        ctx.translate(monster.x, GROUND_Y - 50);
-        if (monster.windup > 0) { ctx.shadowColor = '#f87171'; ctx.shadowBlur = 25; }
-        if (monster.hitFlash > 0) ctx.globalAlpha = 0.5 + 0.5 * (1 - monster.hitFlash);
-        ctx.font = '64px serif';
-        ctx.textAlign = 'center';
+        ctx.translate(monster.x, GROUND_Y);
         ctx.scale(monster.facing, 1);
-        ctx.fillText(monster.emoji, 0, 0);
+        const windupT = monster.windup > 0 ? Math.max(0, Math.min(1, (monster.windup - performance.now()) / 420)) : 0;
+        VectorChar.drawMonster(ctx, monster, {
+            idleT: monster.idleT || 0,
+            windup: monster.windup,
+            windupT,
+            hitFlash: monster.hitFlash,
+            stunned: monster.stunned > performance.now(),
+            hue: monster.hue,
+        });
         ctx.restore();
         if (monster.ailment) {
             ctx.save();
@@ -467,17 +476,21 @@ const RT = (() => {
 
         // player
         ctx.save();
-        ctx.translate(player.x, GROUND_Y - 45);
-        if (player.invuln > performance.now()) ctx.globalAlpha = 0.6;
-        if (player.hitFlash > 0) { ctx.globalAlpha = 0.5 + 0.5 * (1 - player.hitFlash); }
+        ctx.translate(player.x, GROUND_Y);
         const moving = keys.left || keys.right || touch.left || touch.right;
-        const bob = player.dashing ? 0 : Math.sin(performance.now() / 150) * 2 * (moving ? 1 : 0.3);
+        const bob = player.dashing ? 0 : Math.sin(performance.now() / 150) * 1.5 * (moving ? 1 : 0.3);
         ctx.translate(0, bob);
-        const scaleAtk = 1 + player.atkAnim * 0.25;
-        ctx.scale(player.facing * scaleAtk, scaleAtk);
-        ctx.font = '56px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(ROLE_EMOJI[user.role] || '🧍', 0, 0);
+        if (player.invuln > performance.now()) ctx.globalAlpha = 0.6;
+        ctx.scale(player.facing, 1);
+        VectorChar.drawPlayer(ctx, player, user.role, {
+            runPhase: player.runPhase || 0,
+            idleT: player.idleT || 0,
+            moving,
+            dashing: player.dashing,
+            defending: player.defending,
+            atkAnim: player.atkAnim,
+            hitFlash: player.hitFlash,
+        });
         ctx.restore();
 
         // floating texts
@@ -525,6 +538,7 @@ const RT = (() => {
                 monster.name = battle.monster?.name || monster.name;
                 monster.x = ARENA_W - 160; monster.windup = 0; monster.stunned = 0; monster.ailment = null;
                 monster.attackCdEnd = performance.now() + 900;
+                monster.hue = VectorChar.hueFromName(monster.name);
                 user = { ...user, ...data.user };
                 player.maxHp = user.maxHp; player.maxMana = user.maxMana;
                 player.hp = Math.min(player.hp, player.maxHp);

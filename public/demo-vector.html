@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Vector Stickman Demo</title>
+<style>
+  body { background:#0c0818; color:#ede8e0; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; padding:20px; }
+  canvas { background:#1a1230; border:1px solid #333; border-radius:8px; }
+  .row { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; justify-content:center; }
+  button, select { padding:8px 14px; border-radius:6px; border:1px solid #555; background:#222; color:#eee; cursor:pointer; }
+  button:active { background:#444; }
+</style>
+</head>
+<body>
+<h2>Demo Vector Stickman (Silhouette + Outline)</h2>
+<canvas id="c" width="760" height="280"></canvas>
+<div class="row">
+  <select id="role">
+    <option value="fighter">Fighter ⚔️</option>
+    <option value="mage">Mage 🔮</option>
+    <option value="assassin">Assassin 🗡️</option>
+    <option value="defender">Defender 🛡️</option>
+    <option value="archer">Archer 🏹</option>
+    <option value="wraith">Wraith 💀</option>
+    <option value="alchemist">Alchemist ⚗️</option>
+  </select>
+  <button id="btnMove">Toggle Run</button>
+  <button id="btnAtk">Attack</button>
+  <button id="btnDash">Dash</button>
+  <button id="btnDef">Toggle Defend</button>
+  <button id="btnHit">Hit Flash</button>
+  <button id="btnWindup">Monster Windup</button>
+  <button id="btnStun">Toggle Stun</button>
+</div>
+<script src="vectorChar.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const GROUND_Y = 210;
+
+let player = { x:200, idleT:0, runPhase:0, moving:false, dashing:false, defending:false, atkAnim:0, hitFlash:0, facing:1 };
+let monster = { idleT:0, windup:0, hitFlash:0, stunned:false, hue: VectorChar.hueFromName('Goblin Raider') };
+let role = 'fighter';
+let last = performance.now();
+
+document.getElementById('role').addEventListener('change', e => role = e.target.value);
+document.getElementById('btnMove').addEventListener('click', () => player.moving = !player.moving);
+document.getElementById('btnAtk').addEventListener('click', () => player.atkAnim = 1);
+document.getElementById('btnDash').addEventListener('click', () => { player.dashing = true; setTimeout(()=>player.dashing=false, 250); });
+document.getElementById('btnDef').addEventListener('click', () => player.defending = !player.defending);
+document.getElementById('btnHit').addEventListener('click', () => player.hitFlash = 1);
+document.getElementById('btnWindup').addEventListener('click', () => { monster._wEnd = performance.now() + 420; });
+document.getElementById('btnStun').addEventListener('click', () => monster.stunned = !monster.stunned);
+
+function loop(ts) {
+    const dt = Math.min(0.05, (ts - last)/1000); last = ts;
+    player.idleT += dt;
+    if (player.moving) player.runPhase += dt * (player.dashing ? 4 : 9);
+    if (player.atkAnim > 0) player.atkAnim = Math.max(0, player.atkAnim - dt*4);
+    if (player.hitFlash > 0) player.hitFlash = Math.max(0, player.hitFlash - dt*3);
+    monster.idleT += dt;
+    if (monster.hitFlash > 0) monster.hitFlash = Math.max(0, monster.hitFlash - dt*3);
+
+    let windupT = 0, windupActive = 0;
+    if (monster._wEnd && ts < monster._wEnd) { windupT = (monster._wEnd - ts)/420; windupActive = 1; }
+    else monster._wEnd = 0;
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const grad = ctx.createLinearGradient(0,0,0,280);
+    grad.addColorStop(0,'#1a1230'); grad.addColorStop(1,'#0c0818');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,760,280);
+    ctx.fillStyle = '#241a3d'; ctx.fillRect(0,GROUND_Y,760,70);
+
+    ctx.save();
+    ctx.translate(560, GROUND_Y);
+    VectorChar.drawMonster(ctx, monster, { idleT:monster.idleT, windup:windupActive, windupT, hitFlash:monster.hitFlash, stunned:monster.stunned, hue:monster.hue });
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(player.x, GROUND_Y);
+    VectorChar.drawPlayer(ctx, player, role, { runPhase:player.runPhase, idleT:player.idleT, moving:player.moving, dashing:player.dashing, defending:player.defending, atkAnim:player.atkAnim, hitFlash:player.hitFlash });
+    ctx.restore();
+
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
