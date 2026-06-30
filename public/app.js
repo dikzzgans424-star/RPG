@@ -808,51 +808,63 @@ function renderFarm(farm) {
 // ── SEED PICKER MODAL ──
 let farmSelectedSeed = null;
 
-function openFarmPlantModal() {
-    if (!lastFarmData) return;
+async function openFarmPlantModal() {
     farmSelectedSeed = null;
     $('farmPlantQtyRow').style.display = 'none';
     $('farmPlantConfirmBtn').disabled = true;
     $('farmPlantQty').value = 1;
-
-    const owned = lastFarmData.ownedSeeds || {};
-    const keys = Object.keys(owned);
-
-    if (keys.length === 0) {
-        $('farmSeedGrid').innerHTML = `<div class="farm-empty-state" style="padding:24px 12px">
-            <div class="farm-empty-icon">🌱</div>
-            <div class="farm-empty-title">Belum Punya Benih</div>
-            <div class="farm-empty-desc">Beli benih dulu di Shop sebelum menanam.</div>
-        </div>`;
-    } else {
-        $('farmSeedGrid').innerHTML = keys.map(key => {
-            const plant = lastFarmData.plantTable[key];
-            const qty = owned[key];
-            const timeMin = Math.floor(plant.time / 60000);
-            return `<div class="farm-seed-card" id="farmSeedCard-${key}" onclick="selectFarmSeed('${key}')">
-                <div class="farm-seed-icon">${cropIcon(key)}</div>
-                <div class="farm-seed-name">${key.charAt(0).toUpperCase() + key.slice(1)}</div>
-                <div class="farm-seed-meta">📦 ${qty} &nbsp;•&nbsp; ⏱️ ${timeMin}m</div>
-            </div>`;
-        }).join('');
-    }
-
+    $('farmSeedGrid').innerHTML = '<p style="text-align:center;opacity:.5;padding:16px 0">Memuat benih...</p>';
     $('farmPlantModal').style.display = '';
+
+    try {
+        const res = await fetch(`/api/farm?id=${encodeURIComponent(senderId())}`);
+        const data = await res.json();
+        if (!data.ok) {
+            $('farmSeedGrid').innerHTML = `<div class="error-text">${data.error}</div>`;
+            return;
+        }
+        // Update lastFarmData supaya info lahan juga fresh
+        lastFarmData = data.farm;
+
+        const owned = data.farm.ownedSeeds || {};
+        const plantTable = data.farm.plantTable || {};
+        const keys = Object.keys(owned);
+
+        if (keys.length === 0) {
+            $('farmSeedGrid').innerHTML = `<div class="farm-empty-state" style="padding:24px 12px">
+                <div class="farm-empty-icon">🌱</div>
+                <div class="farm-empty-title">Belum Punya Benih</div>
+                <div class="farm-empty-desc">Beli benih dulu di Shop sebelum menanam.</div>
+            </div>`;
+        } else {
+            $('farmSeedGrid').innerHTML = keys.map(key => {
+                const plant = plantTable[key] || {};
+                const qty = owned[key];
+                const timeMin = plant.time ? Math.floor(plant.time / 60000) : '?';
+                return `<div class="farm-seed-card" id="farmSeedCard-${key}" onclick="selectFarmSeed('${key}', ${qty})">
+                    <div class="farm-seed-icon">${cropIcon(key)}</div>
+                    <div class="farm-seed-name">${key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                    <div class="farm-seed-meta">📦 ${qty} &nbsp;•&nbsp; ⏱️ ${timeMin}m</div>
+                </div>`;
+            }).join('');
+        }
+    } catch (e) {
+        $('farmSeedGrid').innerHTML = `<div class="error-text">Gagal memuat benih. Coba lagi.</div>`;
+    }
 }
 
 function closeFarmPlantModal() {
     $('farmPlantModal').style.display = 'none';
 }
 
-function selectFarmSeed(key) {
+function selectFarmSeed(key, maxQty) {
     farmSelectedSeed = key;
     document.querySelectorAll('.farm-seed-card').forEach(el => el.classList.remove('farm-seed-card-active'));
     $(`farmSeedCard-${key}`)?.classList.add('farm-seed-card-active');
 
-    const maxQty = lastFarmData.ownedSeeds[key] || 1;
     const qtyInput = $('farmPlantQty');
     qtyInput.value = 1;
-    qtyInput.max = maxQty;
+    qtyInput.max = Math.min(maxQty, 999);
     $('farmPlantQtyLabel').textContent = `Jumlah (maks ${maxQty}):`;
     $('farmPlantQtyRow').style.display = 'flex';
     $('farmPlantConfirmBtn').disabled = false;
