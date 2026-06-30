@@ -211,12 +211,39 @@ const RT = (() => {
                 if (user.role === 'mage' && user.level >= 20) dmg = Math.floor(dmg * 1.15);
                 const finalDmg = Math.max(1, dmg - monster.def);
                 applyDamageToMonster(finalDmg, false, '✨');
-                if (skill.effect === 'stun') { monster.stunned = performance.now() + 1400; }
+                applySkillEffect(skill);
             } else {
                 spawnFloat(player.x, GROUND_Y - 100, 'Too far!', '#f87171');
             }
+        } else {
+            applySkillEffect(skill);
         }
         player.atkAnim = 1;
+    }
+
+    const AILMENT_EMOJI = { burn: '🔥', poison: '☠️', bleed: '🩸' };
+    const AILMENT_COLOR = { burn: '#fb923c', poison: '#a3e635', bleed: '#f87171' };
+    const AILMENT_TICK_MS = 900;
+
+    function applySkillEffect(skill) {
+        if (!skill.effect) return;
+        if (monster.hp <= 0) return;
+        if (skill.effect === 'stun') {
+            monster.stunned = performance.now() + 1400;
+            spawnFloat(monster.x, GROUND_Y - 140, 'STUNNED!', '#facc15');
+        } else if (skill.effect === 'debuff_def') {
+            monster.def = Math.floor(monster.def * 0.7);
+            spawnFloat(monster.x, GROUND_Y - 140, 'DEF -30%', '#93c5fd');
+        } else if (['burn', 'poison', 'bleed'].includes(skill.effect)) {
+            const isBoss = !!(battle.isBoss || battle.isBossWave);
+            const dmgEach = Math.max(1, Math.floor(monster.maxHp * (isBoss ? 0.025 : 0.05)));
+            const ticks = (user.role === 'alchemist' && user.level >= 20) ? 4 : 3;
+            monster.ailment = {
+                type: skill.effect, ticksLeft: ticks, dmgEach,
+                nextTickAt: performance.now() + AILMENT_TICK_MS,
+            };
+            spawnFloat(monster.x, GROUND_Y - 140, `${AILMENT_EMOJI[skill.effect]} ${skill.effect.toUpperCase()}`, AILMENT_COLOR[skill.effect]);
+        }
     }
 
     function doDash() {
@@ -311,6 +338,18 @@ const RT = (() => {
             }
         }
         if (monster.hitFlash > 0) monster.hitFlash = Math.max(0, monster.hitFlash - dt * 3);
+
+        // Status effect ticks (burn/poison/bleed)
+        if (monster.ailment && monster.hp > 0 && ts >= monster.ailment.nextTickAt) {
+            const ail = monster.ailment;
+            monster.hp = Math.max(0, monster.hp - ail.dmgEach);
+            monster.hitFlash = 1;
+            spawnFloat(monster.x, GROUND_Y - 130, `${AILMENT_EMOJI[ail.type]} -${ribu(ail.dmgEach)}`, AILMENT_COLOR[ail.type]);
+            ail.ticksLeft--;
+            ail.nextTickAt = ts + AILMENT_TICK_MS;
+            if (ail.ticksLeft <= 0) monster.ailment = null;
+            if (monster.hp <= 0) onMonsterDown();
+        }
 
         // Mana regen
         const manaRegen = (user.role === 'mage' && user.level >= 5) ? player.maxMana * 0.02 : player.maxMana * 0.004;
@@ -418,6 +457,13 @@ const RT = (() => {
         ctx.scale(monster.facing, 1);
         ctx.fillText(monster.emoji, 0, 0);
         ctx.restore();
+        if (monster.ailment) {
+            ctx.save();
+            ctx.font = '20px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(AILMENT_EMOJI[monster.ailment.type], monster.x, GROUND_Y - 105);
+            ctx.restore();
+        }
 
         // player
         ctx.save();
@@ -477,7 +523,7 @@ const RT = (() => {
                 monster.atk = battle.monsterAtk; monster.def = battle.monsterDef || 0;
                 monster.emoji = battle.monster?.emoji || monster.emoji;
                 monster.name = battle.monster?.name || monster.name;
-                monster.x = ARENA_W - 160; monster.windup = 0; monster.stunned = 0;
+                monster.x = ARENA_W - 160; monster.windup = 0; monster.stunned = 0; monster.ailment = null;
                 monster.attackCdEnd = performance.now() + 900;
                 user = { ...user, ...data.user };
                 player.maxHp = user.maxHp; player.maxMana = user.maxMana;
