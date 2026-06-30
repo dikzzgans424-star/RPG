@@ -169,271 +169,37 @@ function resumeBattle(mode, battle, user) {
     showBattle();
 }
 
-// ─── SHOW BATTLE UI ───
-let battleCdTimer = null;
-
+// ─── SHOW BATTLE UI (real-time 2D arena) ───
 function showBattle() {
-    if (battleCdTimer) { clearInterval(battleCdTimer); battleCdTimer = null; }
     $('loginSection').style.display    = 'none';
     $('dashboardSection').style.display = 'none';
     $('battleSection').style.display   = '';
     $('backBtn').style.display         = 'none';
     $('battleSection').querySelector('.result-overlay')?.remove();
-    // Reset semua tombol action agar tidak stuck disabled dari battle sebelumnya
-    document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
 
-    const b    = currentBattle;
-    const u    = currentUser;
-    const mode = currentMode;
+    setStatus(`Battle ${currentMode} aktif! Gerak bebas — serang, dash, defend.`, 'active');
 
-    const modeLabels = {
-        hunt: '🗡️ MONSTER HUNT',
-        dungeon: '🏰 DUNGEON',
-        beast: '🐉 ANCIENT BEAST',
-        horde: '👹 HORDE INVASION',
+    window.onRTBattleEnd = (event, data) => {
+        currentUser = { ...currentUser, ...data.user };
+        if (event === 'final_win') {
+            showResult('win', data.reward, { isBoss: currentBattle?.isBoss });
+        } else if (event === 'lose') {
+            showResult('lose', null);
+        } else if (event === 'flee') {
+            showResult('flee', null);
+        }
+    };
+    window.onRTBattleError = (msg) => {
+        setStatus('❌ ' + msg, 'error');
+        endBattle();
     };
 
-    $('battleModeTag').textContent = modeLabels[mode] || mode.toUpperCase();
-    $('battleTurn').textContent    = `Turn ${b.turn || 1}`;
-
-    // Monster
-    $('monsterEmoji').textContent  = b.monster?.emoji || '👹';
-    $('monsterName').textContent   = b.monster?.name || '???';
-    $('monsterStatus').textContent = b.isBoss ? '⚠️ BOSS' : (b.isBossWave ? '⚠️ BOSS WAVE' : '');
-
-    if (mode === 'beast' && b.maxPhase) {
-        $('monsterPhase').style.display = '';
-        $('monsterPhase').textContent   = `Phase ${b.phase || 1}/${b.maxPhase}`;
-    } else if (mode === 'horde') {
-        $('monsterPhase').style.display = '';
-        $('monsterPhase').textContent   = `Wave ${b.wave || 1}/${b.maxWave || 10}`;
-    } else {
-        $('monsterPhase').style.display = 'none';
-    }
-
-    updateMonsterHp(b.monsterHp, b.monsterMaxHp);
-    updatePlayerStats(u);
-
-    // Player role emoji
-    const ROLE_EMOJI = { fighter:'⚔️', mage:'🔮', assassin:'🗡️', defender:'🛡️', archer:'🏹', wraith:'💀', alchemist:'⚗️' };
-    $('playerRoleTag').textContent = ROLE_EMOJI[u.role] || '⚔️';
-
-    // Skills in battle
-    renderBattleSkills(u);
-
-    // Potion count
-    updatePotionCount(u);
-
-    // Clear log
-    $('battleLog').innerHTML = `<div class="log-entry log-system">⚔️ ${b.monster?.name || 'Musuh'} muncul! Pilih aksimu...</div>`;
-
-    setStatus(`Battle ${currentMode} aktif!`, 'active');
-    enableActions(true);
-
-    // ─── Live CD countdown untuk skill di battle ───
-    battleCdTimer = setInterval(() => {
-        if (!currentUser || !currentBattle) return;
-        const now2 = Date.now();
-        document.querySelectorAll('#battleSkillsRow .skill-btn').forEach(btn => {
-            const cdSpan = btn.querySelector('.skill-btn-cd');
-            if (!cdSpan) return;
-            const match = cdSpan.textContent.match(/(\d+)s/);
-            if (!match) return;
-            const skillNameEl = btn.querySelector('.skill-btn-name');
-            if (!skillNameEl) return;
-            const sName = skillNameEl.childNodes[0]?.textContent?.replace('✨ ', '').trim();
-            if (!sName) return;
-            const cdEnd = currentUser.cooldowns?.[sName] || 0;
-            const remaining = Math.ceil((cdEnd - now2) / 1000);
-            if (remaining <= 0) {
-                // CD habis — re-render skills
-                renderBattleSkills(currentUser);
-                if (!isProcessing) enableActions(true);
-            } else {
-                cdSpan.textContent = `⏳ ${remaining}s`;
-            }
-        });
-    }, 1000);
+    RT.init($('rtArena'), currentMode, currentBattle, currentUser, unlockedSkills);
 }
 
-function updateMonsterHp(hp, maxHp) {
-    const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
-    $('monsterHpBar').style.width = pct + '%';
-    $('monsterHpText').textContent = `${fmt(Math.max(0, hp))} / ${fmt(maxHp)} HP`;
-}
-
-function updatePlayerStats(u) {
-    const hpPct   = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
-    const manaPct = Math.max(0, Math.min(100, (u.mana / u.maxMana) * 100));
-
-    $('battleHpBar').style.width   = hpPct + '%';
-    $('battleHpBar').dataset.low   = hpPct < 30 ? 'true' : 'false';
-    $('battleManaBar').style.width = manaPct + '%';
-    $('battleHpText').textContent   = `❤️ ${fmt(u.hp)}/${fmt(u.maxHp)}`;
-    $('battleManaText').textContent = `💧 ${fmt(u.mana)}/${fmt(u.maxMana)}`;
-
-    // HP pulse at low HP
-    const playerCard = document.querySelector('.player-battle-card');
-    if (hpPct < 25) playerCard?.classList.add('hp-low-pulse');
-    else playerCard?.classList.remove('hp-low-pulse');
-}
-
-function updatePotionCount(u) {
-    const count = u.inventory?.potion || 0;
-    $('potionCount').textContent = `Potion (${count})`;
-    $('potionBtn').disabled = count < 1;
-}
-
-function renderBattleSkills(u) {
-    if (!unlockedSkills || unlockedSkills.length === 0) {
-        $('battleSkillsSection').style.display = 'none';
-        return;
-    }
-
-    $('battleSkillsSection').style.display = '';
-    const now = Date.now();
-    $('battleSkillsRow').innerHTML = unlockedSkills.map(s => {
-        const cdEnd  = (u.cooldowns?.[s.name] || 0);
-        const onCd   = now < cdEnd;
-        const cdSec  = onCd ? Math.ceil((cdEnd - now) / 1000) : 0;
-        const noMana = (u.mana || 0) < s.mana;
-        const dis    = onCd || noMana;
-        const cdText = onCd ? `<span class="skill-btn-cd">⏳ ${cdSec}s</span>`
-                      : noMana ? `<span class="skill-btn-cd">💧 ${s.mana}MP</span>`
-                      : `<span class="skill-btn-ready">✅ READY</span>`;
-        return `
-        <button class="skill-btn" onclick="doSkill('${s.name}')" ${dis ? 'disabled' : ''}>
-          <span class="skill-btn-name">
-            ✨ ${s.name}
-            <span class="skill-btn-desc">${s.description || ''}</span>
-          </span>
-          <span class="skill-btn-mana">💧${s.mana}</span>
-          ${cdText}
-        </button>`;
-    }).join('');
-}
-
-// ─── DO ACTIONS ───
-async function doAction(action, skillName = null) {
-    if (isProcessing) return;
-    if (!currentBattle || !currentUser) return;
-
-    isProcessing = true;
-    enableActions(false);
-    setStatus('Menghitung giliran...', 'active');
-
-    try {
-        const res = await fetch('/api/battle-action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                senderId: currentUser.senderId,
-                mode: currentMode,
-                action,
-                skillName,
-            })
-        });
-        const data = await res.json();
-
-        if (!data.ok) {
-            addLog('system', '❌ ' + data.error);
-            enableActions(true);
-            isProcessing = false;
-            setStatus('Aksi gagal: ' + data.error, 'error');
-            return;
-        }
-
-        // Update user state
-        currentUser = { ...currentUser, ...data.user };
-        if (data.battle) currentBattle = data.battle;
-
-        // Render log
-        if (data.log) data.log.forEach(l => addLog(l.type, l.text));
-
-        // Update UI
-        updatePlayerStats(currentUser);
-        updatePotionCount(currentUser);
-        renderBattleSkills(currentUser);
-
-        if (data.battle) {
-            updateMonsterHp(data.battle.monsterHp, data.battle.monsterMaxHp);
-            $('battleTurn').textContent = `Turn ${data.battle.turn || 1}`;
-
-            // Update phase / wave
-            if (currentMode === 'beast' && data.battle.maxPhase) {
-                $('monsterPhase').textContent = `Phase ${data.battle.phase || 1}/${data.battle.maxPhase}`;
-            }
-            if (currentMode === 'horde') {
-                $('monsterPhase').textContent = `Wave ${data.battle.wave || 1}/${data.battle.maxWave || 10}`;
-                $('monsterEmoji').textContent = data.battle.monster?.emoji || '👹';
-                $('monsterName').textContent  = data.battle.monster?.name  || '???';
-                $('monsterStatus').textContent = data.battle.isBossWave ? '⚠️ BOSS WAVE' : '';
-            }
-        } else if (data.finalMonsterHp !== undefined && data.finalMonsterMaxHp) {
-            // Battle sudah selesai (win/lose/flee/horde_complete) — backend tidak
-            // mengirim battle state lagi, tapi server tetap kirim HP final yang
-            // benar (0 saat menang) supaya bar tidak nyangkut di angka sebelumnya.
-            updateMonsterHp(data.finalMonsterHp, data.finalMonsterMaxHp);
-        }
-
-        // Handle result
-        switch (data.turnResult) {
-            case 'win':
-                showResult('win', data.reward, { isBoss: data.isBoss });
-                break;
-            case 'lose':
-                showResult('lose', null);
-                break;
-            case 'flee':
-                showResult('flee', null);
-                break;
-            case 'horde_complete':
-                showResult('horde_complete', data.reward);
-                break;
-            case 'next_wave':
-            case 'next_phase':
-                enableActions(true);
-                setStatus(`${currentMode} battle berlanjut!`, 'active');
-                break;
-            default:
-                enableActions(true);
-                setStatus('Giliranmu!', 'active');
-        }
-
-        isProcessing = false;
-    } catch (e) {
-        addLog('system', '❌ Koneksi error. Coba lagi.');
-        enableActions(true);
-        isProcessing = false;
-        setStatus('Error koneksi', 'error');
-    }
-}
-
-function doSkill(skillName) {
-    doAction('skill', skillName);
-}
-
-// ─── BATTLE LOG ───
-function addLog(type, text) {
-    const log  = $('battleLog');
-    const div  = document.createElement('div');
-    div.className = `log-entry log-${type}`;
-    div.textContent = text;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-}
-
-// ─── ENABLE/DISABLE ACTIONS ───
+// ─── ENABLE/DISABLE ACTIONS (stub kept for showResult compatibility) ───
 function enableActions(enabled) {
-    document.querySelectorAll('.action-btn').forEach(b => {
-        // Keep potion disabled if 0 potions regardless
-        if (b.id === 'potionBtn') {
-            b.disabled = !enabled || (currentUser?.inventory?.potion || 0) < 1;
-        } else {
-            b.disabled = !enabled;
-        }
-    });
-    document.querySelectorAll('.skill-btn').forEach(b => b.disabled = !enabled);
+    // no-op: kontrol real-time battle dikelola sepenuhnya oleh battle2d.js (RT)
 }
 
 // ─── SHOW RESULT ───
@@ -508,7 +274,7 @@ async function nextDungeonFloor() {
 // ─── END BATTLE / BACK ───
 async function endBattle() {
     isProcessing = false;  // Reset agar battle berikutnya bisa dimulai
-    if (battleCdTimer) { clearInterval(battleCdTimer); battleCdTimer = null; }
+    RT.destroy();
     // Refresh character from server then go to dashboard
     try {
         setStatus('Memuat karakter...', 'active');

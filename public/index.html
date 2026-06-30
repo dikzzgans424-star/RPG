@@ -362,82 +362,8 @@
       <div class="battle-turn" id="battleTurn">Turn 1</div>
     </div>
 
-    <!-- Monster Card -->
-    <div class="monster-card glass-card">
-      <div class="monster-header">
-        <div class="monster-emoji" id="monsterEmoji">👹</div>
-        <div class="monster-info">
-          <div class="monster-name" id="monsterName">-</div>
-          <div class="monster-status" id="monsterStatus"></div>
-        </div>
-        <div class="monster-phase" id="monsterPhase" style="display:none"></div>
-      </div>
-      <div class="stat-bar-wrap">
-        <div class="stat-bar monster-hp-bar" id="monsterHpBar"></div>
-      </div>
-      <div class="monster-hp-text" id="monsterHpText">-/-</div>
-    </div>
-
-    <!-- VS Divider -->
-    <div class="vs-divider">
-      <div class="vs-line"></div>
-      <div class="vs-chip">VS</div>
-      <div class="vs-line"></div>
-    </div>
-
-    <!-- Player Battle Stats -->
-    <div class="player-battle-card glass-card">
-      <div class="player-battle-header">
-        <div class="player-role-tag" id="playerRoleTag">-</div>
-        <div class="player-battle-info">
-          <div class="stat-bar-wrap">
-            <div class="stat-bar hp-bar" id="battleHpBar"></div>
-          </div>
-          <div class="player-hp-text" id="battleHpText">-/-</div>
-        </div>
-        <div class="player-mana-wrap">
-          <div class="stat-bar-wrap">
-            <div class="stat-bar mana-bar" id="battleManaBar"></div>
-          </div>
-          <div class="player-mana-text" id="battleManaText">-/-</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Battle Log -->
-    <div class="battle-log glass-card" id="battleLog">
-      <div class="log-entry log-system">⚔️ Battle dimulai! Pilih aksimu...</div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="action-grid" id="actionGrid">
-      <button class="action-btn btn-attack" onclick="doAction('attack')">
-        <span class="action-icon">⚔️</span>
-        <span>Serang</span>
-      </button>
-      <button class="action-btn btn-defend" onclick="doAction('defend')">
-        <span class="action-icon">🛡️</span>
-        <span>Defend</span>
-      </button>
-      <button class="action-btn btn-dodge" onclick="doAction('dodge')">
-        <span class="action-icon">💨</span>
-        <span>Dodge</span>
-      </button>
-      <button class="action-btn btn-potion" onclick="doAction('potion')" id="potionBtn">
-        <span class="action-icon">🧪</span>
-        <span id="potionCount">Potion (0)</span>
-      </button>
-      <button class="action-btn btn-flee" onclick="doAction('flee')">
-        <span class="action-icon">🏃</span>
-        <span>Kabur</span>
-      </button>
-    </div>
-
-    <!-- Skills in Battle -->
-    <div class="battle-skills" id="battleSkillsSection" style="display:none">
-      <div class="skills-label">✨ Skills</div>
-      <div class="skills-row" id="battleSkillsRow"></div>
-    </div>
+    <!-- Real-time 2D Arena (diisi oleh battle2d.js) -->
+    <div id="rtArena"></div>
 
     <!-- End Battle Button -->
     <button class="btn-back" id="backBtn" style="display:none" onclick="endBattle()">
@@ -455,6 +381,7 @@
   <div class="footer">Miwa — Premium RPG Engine</div>
 </div>
 
+<script src="battle2d.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
