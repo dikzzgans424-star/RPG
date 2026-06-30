@@ -1,74 +1,63 @@
-# 🗡️ Miwa RPG Battle Web
+# Miwa RPG — Versi Netlify
 
-Web battle turn-based yang terintegrasi langsung dengan database MongoDB bot WhatsApp RPG kamu.
+Source code ini sudah dikonversi dari Vercel Serverless Functions ke **Netlify Functions**,
+tanpa mengubah logic game sama sekali (file di `netlify/functions/_impl/` adalah salinan
+persis dari `api/*.js` versi Vercel).
 
-## Struktur Project
+## Struktur
 
 ```
-rpg-battle/
-├── api/
-│   ├── _db.js           # MongoDB client (shared)
-│   ├── _rpg.js          # RPG engine (roleData, stats, monsters)
-│   ├── character.js     # GET /api/character?id=SENDER_ID
-│   ├── battle-start.js  # POST /api/battle-start
-│   └── battle-action.js # POST /api/battle-action
-├── public/
-│   ├── index.html
-│   ├── css/style.css
-│   └── js/app.js
-├── vercel.json
-├── package.json
-└── .env.example
+netlify.toml                  <- config Netlify (redirect /api/* -> functions)
+package.json                  <- dependency (mongodb)
+public/                       <- frontend (index.html, app.js, style.css, battle2d.js) — TIDAK DIUBAH
+netlify/functions/
+  _adapter.js                 <- shim supaya handler gaya (req,res) bisa jalan di Netlify
+  _impl/                      <- logic asli (copy dari api/*.js Vercel, tidak diubah)
+  character.js, gather.js, dst <- wrapper tipis per endpoint
 ```
 
-## Deploy ke Vercel
+Karena ada redirect `/api/*` → `/.netlify/functions/:splat` di `netlify.toml`,
+frontend (`public/app.js`) **tidak perlu diubah** — tetap fetch ke `/api/character`,
+`/api/gather`, dll seperti biasa.
 
-### 1. Install Vercel CLI
+## Cara Deploy
+
+### Opsi A — lewat Netlify Dashboard (drag & drop / Git)
+1. Buat site baru di https://app.netlify.com
+2. Kalau dari Git: connect repo ini, build command kosongkan (tidak perlu build step),
+   publish directory otomatis terbaca dari `netlify.toml` (`public`).
+3. Kalau drag & drop: zip folder ini lalu upload langsung di dashboard Netlify
+   (menu "Deploys" → "Drag and drop your site folder here").
+
+### Opsi B — lewat Netlify CLI
 ```bash
-npm i -g vercel
+npm install -g netlify-cli
+netlify login
+netlify deploy --prod
 ```
 
-### 2. Login
-```bash
-vercel login
+## WAJIB: Set Environment Variable
+
+Sama seperti di Vercel, set environment variable berikut di:
+**Site settings → Environment variables**
+
+```
+MONGO_URI = <connection string MongoDB kamu, sama persis dengan yang dipakai bot WA>
 ```
 
-### 3. Deploy
-```bash
-cd rpg-battle
-vercel
-```
+Tanpa env var ini, semua endpoint akan gagal connect ke database.
 
-### 4. Set Environment Variable
-Di Vercel dashboard → Project → Settings → Environment Variables:
+## Catatan
 
-| Key | Value |
-|-----|-------|
-| `MONGO_URI` | `mongodb+srv://USERNAME:PASSWORD@cluster0.xxxxx.mongodb.net/?appName=Cluster0` |
-
-> ⚠️ Gunakan URI MongoDB yang sama persis dengan yang ada di `rpg.js` bot kamu.
-
-### 5. Redeploy setelah set env var
-```bash
-vercel --prod
-```
-
-## Cara Pakai
-
-1. Buka URL Vercel yang diberikan
-2. Masukkan ID WhatsApp kamu (format: `628xxxxxxxxxx`)
-3. Data karakter otomatis diambil dari database bot
-4. Pilih mode battle:
-   - 🗡️ **Hunt** — Berburu monster random
-   - 🏰 **Dungeon** — Floor demi floor, boss setiap 10 floor
-   - 🐉 **Ancient Beast** — Boss 3 fase, reward terbesar
-   - 👹 **Horde Invasion** — 10 gelombang monster
-5. Battle dengan actions: Serang, Defend, Dodge, Potion, Kabur, atau Skills
-6. Hasil battle (EXP, Gold, Loot) langsung tersimpan ke MongoDB
-
-## Notes
-
-- Data karakter real-time dari database yang sama dengan bot WA
-- Semua stats, skills, passives 100% sama dengan `rpg.js`
-- Battle state tersimpan di MongoDB — bisa dilanjut kapan saja
-- Jika ada battle aktif di bot WA, tidak bisa mulai battle baru di web (dan sebaliknya)
+- `node_bundler = "esbuild"` di `netlify.toml` dipakai supaya dependency `mongodb`
+  otomatis ikut ter-bundle ke tiap function.
+- Semua 14 endpoint (character, battle-start, battle-action, battle-resolve, adventure,
+  equipment, explore, farm, gacha, gather, hunt-animal, sell, shop, stats) sudah dikonversi.
+- Kalau nanti nambah endpoint baru, taruh logic-nya di `netlify/functions/_impl/namafile.js`
+  (format `module.exports = async (req, res) => {...}` seperti biasa), lalu buat wrapper
+  baru di `netlify/functions/namafile.js`:
+  ```js
+  const { wrap } = require('./_adapter');
+  const handler = require('./_impl/namafile.js');
+  module.exports.handler = wrap(handler);
+  ```

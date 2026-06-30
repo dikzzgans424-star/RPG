@@ -1,7 +1,7 @@
 {
-  "name": "rpg-battle-web",
+  "name": "rpg-battle-web-netlify",
   "version": "1.0.0",
-  "description": "RPG Battle Web - Miwa RPG",
+  "description": "RPG Battle Web - Miwa RPG (Netlify version)",
   "dependencies": {
     "mongodb": "^6.0.0"
   }
