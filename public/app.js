@@ -59,38 +59,11 @@ function showError(msg) {
     el.style.display = 'block';
     $('senderIdInput').classList.add('shake');
     setTimeout(() => $('senderIdInput').classList.remove('shake'), 400);
-    showErrorModal(msg);
 }
 
 function hideError() {
     $('loginError').style.display = 'none';
 }
-
-// ─── ERROR POPUP MODAL (console-log style) ───
-function showErrorModal(msg) {
-    const overlay = $('errorModalOverlay');
-    const msgEl   = $('errorModalMsg');
-    if (!overlay || !msgEl) return;
-    msgEl.textContent = String(msg);
-    overlay.style.display = 'flex';
-}
-
-function hideErrorModal() {
-    const overlay = $('errorModalOverlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const overlay = $('errorModalOverlay');
-    if (overlay) {
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) hideErrorModal();
-        });
-    }
-});
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hideErrorModal();
-});
 
 // ─── SHOW DASHBOARD ───
 function showDashboard(data) {
@@ -1521,7 +1494,7 @@ async function confirmBuy() {
             body: JSON.stringify({ senderId: senderId(), itemKey: shopBuyTarget.key, qty }),
         });
         const data = await res.json();
-        if (!data.ok) { showErrorModal(`❌ ${data.error}`); return; }
+        if (!data.ok) { alert(`❌ ${data.error}`); return; }
 
         currentUser = { ...currentUser, ...data.user };
         updateCharStats(currentUser);
@@ -1529,7 +1502,7 @@ async function confirmBuy() {
         closeBuyModal();
         await loadShopItems(); // refresh limit harian & owned count
         showLifeLog(`🛒 Berhasil beli <b>${qty}x ${data.bought.name}</b> — -${fmt(data.totalGold)} 🪙`);
-    } catch { showErrorModal('❌ Gagal terhubung ke server.'); }
+    } catch { alert('❌ Gagal terhubung ke server.'); }
 }
 
 // ════════════════════════════════════════
@@ -1632,13 +1605,13 @@ async function doEquip(idx, force) {
             if (data.needForce && confirm(`${data.error}\n\nPaksa pakai item rusak ini? (Tidak ada bonus stat)`)) {
                 return doEquip(idx, true);
             }
-            showErrorModal(data.error);
+            alert(data.error);
             return;
         }
         invData = data;
         renderInventory();
         await refreshCharacterStats();
-    } catch (e) { showErrorModal('❌ Gagal equip item.'); }
+    } catch (e) { alert('❌ Gagal equip item.'); }
 }
 
 async function doUnequip(slot) {
@@ -1649,11 +1622,11 @@ async function doUnequip(slot) {
             body: JSON.stringify({ senderId: senderId(), action: 'unequip', slot }),
         });
         const data = await res.json();
-        if (!data.ok) { showErrorModal(data.error); return; }
+        if (!data.ok) { alert(data.error); return; }
         invData = data;
         renderInventory();
         await refreshCharacterStats();
-    } catch (e) { showErrorModal('❌ Gagal unequip item.'); }
+    } catch (e) { alert('❌ Gagal unequip item.'); }
 }
 
 async function doRepair(idx) {
@@ -1664,11 +1637,11 @@ async function doRepair(idx) {
             body: JSON.stringify({ senderId: senderId(), action: 'repair', idx }),
         });
         const data = await res.json();
-        if (!data.ok) { showErrorModal(data.error); return; }
+        if (!data.ok) { alert(data.error); return; }
         invData = data;
         renderInventory();
-        showErrorModal(data.message);
-    } catch (e) { showErrorModal('❌ Gagal repair item.'); }
+        alert(data.message);
+    } catch (e) { alert('❌ Gagal repair item.'); }
 }
 
 // Refresh char-card stats (gold/atk/def etc) tanpa reload halaman penuh
